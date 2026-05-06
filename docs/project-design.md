@@ -15,6 +15,7 @@
 - 支持 AI 分析 Markdown 报告生成。
 - 支持将 AI 分析结果保存为 Markdown 报告。
 - 支持通过 Docker Compose 启动后端服务。
+- 支持通过脚本模拟外部服务器发送日志。
 - 不依赖数据库或前端。
 - 不自动执行任何系统命令。
 
@@ -43,12 +44,16 @@
   - `log_type` 表示日志类型，用于选择解析器。
   - AI-OpsLog 服务本身可以监听统一端口，例如 8000，由不同服务通过 HTTP POST 提交日志。
 
+- 日志发送客户端
+  - 当前项目新增 `scripts/send_log.py`，用于模拟外部服务器或容器将日志发送到 AI-OpsLog 服务端。
+  - 当前阶段采用手动执行脚本发送日志，不做复杂实时采集。
+  - 后续可扩展为定时发送最近 N 行日志、`tail -f` 监听新增日志、采集 Docker 容器日志，或接入 Prometheus Alertmanager Webhook。
+
 - 报告生成与沉淀
   - 支持规则解析 Markdown 报告。
   - 支持规则解析结果与通义千问分析结果合并生成 AI Markdown 报告。
   - 支持将 AI 分析结果保存为 Markdown 报告。
   - `reports/` 目录用于沉淀典型故障案例。
-  - 后续可将 `reports/` 目录作为 GitHub 项目展示材料。
   - AI 报告会过滤常见高风险命令，仅保留人工排查参考信息。
 
 ## Docker 化部署

@@ -13,25 +13,13 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 ## Docker 镜像
 
-后端 Dockerfile 位于 `backend/Dockerfile`，使用 `python:3.11-slim`，只复制 `requirements.txt` 和 `app/` 目录，不复制 `.env`。
+后端 Dockerfile 位于 `backend/Dockerfile`，只复制 `requirements.txt` 和 `app/` 目录，不复制 `.env`。
 
 推荐在项目根目录使用 Docker Compose 启动：
 
 ```bash
 cp .env.example .env
 docker compose up -d --build
-```
-
-查看容器状态：
-
-```bash
-docker compose ps
-```
-
-查看日志：
-
-```bash
-docker compose logs -f ai-opslog-backend
 ```
 
 ## 接口
@@ -46,21 +34,7 @@ docker compose logs -f ai-opslog-backend
 - `POST /analyze/ai/report/save`: 生成 AI 日志分析报告，并保存到 `reports/` 目录
 - `POST /logs/ingest`: 接收外部服务日志，自动完成规则解析、通义千问分析、Markdown 报告生成和保存
 
-## 测试命令
-
-健康检查：
-
-```bash
-curl -s http://127.0.0.1:8000/health | python -m json.tool
-```
-
-通义千问连接：
-
-```bash
-curl -s http://127.0.0.1:8000/qwen/test | python -m json.tool
-```
-
-日志接收：
+## 测试日志接收
 
 ```bash
 curl -s -X POST "http://127.0.0.1:8000/logs/ingest" \
@@ -69,11 +43,44 @@ curl -s -X POST "http://127.0.0.1:8000/logs/ingest" \
   | python -m json.tool
 ```
 
-查看报告：
+## 使用日志发送脚本模拟外部服务接入
+
+安装客户端依赖：
 
 ```bash
-ls -lh reports/
+pip install -r requirements-client.txt
 ```
+
+发送 Docker 日志：
+
+```bash
+python scripts/send_log.py \
+  --server http://127.0.0.1:8000 \
+  --source docker-host-01 \
+  --service-name redis-container \
+  --env dev \
+  --log-type docker_log \
+  --file examples/docker_port_conflict.log
+```
+
+发送 Nginx Error 日志：
+
+```bash
+python scripts/send_log.py \
+  --server http://127.0.0.1:8000 \
+  --source nginx-web-01 \
+  --service-name nginx \
+  --env dev \
+  --log-type nginx_error \
+  --file examples/nginx_error_502.log
+```
+
+说明：
+
+- 该脚本用于模拟外部服务器向 AI-OpsLog 发送日志。
+- 当前不是实时采集。
+- 后续可以扩展为定时读取日志或 `tail -f` 增量采集。
+- AI-OpsLog 只负责接收、分析、生成报告，不会自动执行任何系统命令。
 
 ## 安全说明
 
@@ -81,4 +88,3 @@ ls -lh reports/
 - AI 返回的 `related_commands` 只作为人工排查建议。
 - AI 分析结果不能直接作为生产环境操作依据。
 - `DASHSCOPE_API_KEY` 不应提交到 GitHub，也不会写入 Dockerfile 或镜像。
-

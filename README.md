@@ -20,21 +20,11 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 ## 配置通义千问 API Key
 
-方式一：使用环境变量
-
-```bash
-export DASHSCOPE_API_KEY="your_dashscope_api_key_here"
-export DASHSCOPE_BASE_URL="https://dashscope.aliyuncs.com/compatible-mode/v1"
-export QWEN_MODEL="qwen-plus"
-```
-
-方式二：使用 `.env` 文件
-
 ```bash
 cp .env.example .env
 ```
 
-然后编辑项目根目录下的 `.env`：
+编辑项目根目录下的 `.env`：
 
 ```env
 DASHSCOPE_API_KEY=your_dashscope_api_key_here
@@ -46,63 +36,33 @@ QWEN_MODEL=qwen-plus
 
 ## 使用 Docker Compose 启动
 
-1. 复制环境变量文件：
-
 ```bash
 cp .env.example .env
-```
-
-2. 编辑 `.env`，填入自己的通义千问 API Key：
-
-```env
-DASHSCOPE_API_KEY=your_dashscope_api_key_here
-DASHSCOPE_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
-QWEN_MODEL=qwen-plus
-```
-
-3. 构建并启动服务：
-
-```bash
 docker compose up -d --build
 ```
 
-4. 查看容器状态：
+查看容器状态：
 
 ```bash
 docker compose ps
 ```
 
-5. 查看日志：
+查看日志：
 
 ```bash
 docker compose logs -f ai-opslog-backend
 ```
 
-6. 测试健康检查：
+测试健康检查：
 
 ```bash
 curl -s http://127.0.0.1:8000/health | python -m json.tool
 ```
 
-7. 测试通义千问连接：
+测试通义千问连接：
 
 ```bash
 curl -s http://127.0.0.1:8000/qwen/test | python -m json.tool
-```
-
-8. 测试日志接收接口：
-
-```bash
-curl -s -X POST "http://127.0.0.1:8000/logs/ingest" \
-  -H "Content-Type: application/json" \
-  -d '{"source":"docker-host-01","service_name":"redis-container","env":"dev","log_type":"docker_log","log_text":"Error response from daemon: port is already allocated\ncontainer exited with code 1"}' \
-  | python -m json.tool
-```
-
-9. 查看报告：
-
-```bash
-ls -lh reports/
 ```
 
 `reports/` 会挂载到容器内 `/app/reports`，容器生成的 Markdown 报告会持久化到宿主机。
@@ -136,10 +96,57 @@ curl -s -X POST "http://127.0.0.1:8000/logs/ingest" \
 - `env`: 运行环境
 - `log_text`: 多行日志内容
 
+## 使用日志发送脚本模拟外部服务接入
+
+安装客户端依赖：
+
+```bash
+pip install -r requirements-client.txt
+```
+
+发送 Docker 日志：
+
+```bash
+python scripts/send_log.py \
+  --server http://127.0.0.1:8000 \
+  --source docker-host-01 \
+  --service-name redis-container \
+  --env dev \
+  --log-type docker_log \
+  --file examples/docker_port_conflict.log
+```
+
+发送 Nginx Error 日志：
+
+```bash
+python scripts/send_log.py \
+  --server http://127.0.0.1:8000 \
+  --source nginx-web-01 \
+  --service-name nginx \
+  --env dev \
+  --log-type nginx_error \
+  --file examples/nginx_error_502.log
+```
+
+说明：
+
+- 该脚本用于模拟外部服务器向 AI-OpsLog 发送日志。
+- 当前不是实时采集。
+- 后续可以扩展为定时读取日志或 `tail -f` 增量采集。
+- AI-OpsLog 只负责接收、分析、生成报告，不会自动执行任何系统命令。
+
+## 查看报告
+
+```bash
+ls -lh reports/
+cat reports/生成的报告文件名.md
+```
+
+如果中文显示异常，请确保终端编码为 UTF-8。
+
 ## 安全说明
 
 - 本项目不会自动执行任何系统命令。
 - AI 返回的 `related_commands` 只作为人工排查建议。
 - AI 分析结果不能直接作为生产环境操作依据。
 - `DASHSCOPE_API_KEY` 不应提交到 GitHub，也不会写入镜像。
-
