@@ -17,6 +17,8 @@
 - 支持 `--server` 参数指定后端服务地址
 - 支持 `--file` 参数指定日志文件
 - 支持 `--lines` 参数指定读取行数
+- 支持 `--dry-run` 预览模式
+- 支持在不发送后端请求的情况下预览最近 N 行日志内容
 - 支持敏感文件拦截
 - 支持文件不存在时返回错误信息
 - 支持空内容处理
@@ -35,6 +37,8 @@
 - 不接入数据库
 - 不把 AI 分析结果作为自动操作依据
 - AI 返回的命令只作为人工排查建议
+- dry-run 只用于本地预览日志内容，不触发后端分析流程
+- dry-run 不会生成报告
 
 ## 4. 测试记录
 
@@ -62,6 +66,27 @@ python scripts/collect_recent_logs.py \
 - `ai_risk_level` 为 `high`
 - 返回 `report_path`
 - `reports/` 目录生成 Markdown 报告
+
+dry-run 预览测试命令：
+
+```bash
+python scripts/collect_recent_logs.py \
+  --server http://127.0.0.1:8000 \
+  --source nginx-web-01 \
+  --service-name nginx \
+  --env dev \
+  --log-type nginx_error \
+  --file examples/nginx_error_502.log \
+  --lines 10 \
+  --dry-run
+```
+
+测试结果：
+
+- 终端出现 `[DRY-RUN]` 标识
+- 成功打印 `examples/nginx_error_502.log` 中的日志内容
+- 没有请求 `/logs/ingest`
+- 没有生成新的报告文件
 
 敏感文件拦截测试：
 

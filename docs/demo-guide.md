@@ -114,7 +114,7 @@ python scripts/collect_recent_logs.py \
 
 ## dry-run 预览模式
 
-dry-run 模式用于在真正发送日志到后端前，先确认脚本读取到的日志内容是否正确。
+dry-run 模式适合在发送日志分析前使用，用于确认当前脚本读取到的日志内容是否符合预期。
 
 ```bash
 python scripts/collect_recent_logs.py \
@@ -128,7 +128,14 @@ python scripts/collect_recent_logs.py \
   --dry-run
 ```
 
-该模式不会请求 `/logs/ingest`，也不会生成 `reports/` 报告。
+预期结果：
+
+- 终端会打印读取到的日志内容
+- 输出中会出现 `[DRY-RUN]` 标识
+- 不会请求 `/logs/ingest`
+- 不会生成 Markdown 报告
+
+如果 dry-run 输出的日志内容确认无误，可以去掉 `--dry-run` 参数，正式发送到 `/logs/ingest` 进行规则分析、AI 分析和报告生成。
 
 ## 4. 查看接口返回结果
 

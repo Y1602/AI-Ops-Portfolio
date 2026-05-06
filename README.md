@@ -120,6 +120,43 @@ python scripts/collect_recent_logs.py \
 
 执行成功后，控制台会返回 `/logs/ingest` 接口响应结果，并在 `reports/` 目录下生成新的 Markdown 故障分析报告。
 
+### dry-run 预览模式
+
+`--dry-run` 是预览模式，用于在真正发送日志到 `/logs/ingest` 之前，先确认脚本读取到的日志内容是否正确。
+
+dry-run 模式下：
+
+- 会解析参数
+- 会检查日志文件路径
+- 会执行敏感文件拦截
+- 会读取指定日志文件最后 N 行
+- 会在终端打印读取到的日志内容
+- 不会请求 `/logs/ingest`
+- 不会触发 AI 分析
+- 不会生成 `reports/` 报告
+
+示例命令：
+
+```bash
+python scripts/collect_recent_logs.py \
+  --server http://127.0.0.1:8000 \
+  --source nginx-web-01 \
+  --service-name nginx \
+  --env dev \
+  --log-type nginx_error \
+  --file examples/nginx_error_502.log \
+  --lines 10 \
+  --dry-run
+```
+
+示例输出：
+
+```text
+[DRY-RUN] Read last 10 lines from examples/nginx_error_502.log
+[DRY-RUN] The following log content will not be sent to server:
+...
+```
+
 当前能力边界：
 
 - 当前只支持手动执行一次采集
