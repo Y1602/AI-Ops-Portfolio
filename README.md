@@ -120,6 +120,8 @@ python scripts/collect_recent_logs.py \
 
 执行成功后，控制台会返回 `/logs/ingest` 接口响应结果，并在 `reports/` 目录下生成新的 Markdown 故障分析报告。
 
+如果需要使用 cron 定时执行最近日志采集脚本，可以参考：[docs/cron-guide.md](docs/cron-guide.md)。
+
 ### dry-run 预览模式
 
 `--dry-run` 是预览模式，用于在真正发送日志到 `/logs/ingest` 之前，先确认脚本读取到的日志内容是否正确。

@@ -23,6 +23,7 @@
 - 支持文件不存在时返回错误信息
 - 支持空内容处理
 - 支持与现有规则分析、AI 分析、Markdown 报告生成链路衔接
+- 已补充 cron 定时采集说明文档：`docs/cron-guide.md`
 
 ## 3. 当前能力边界
 
@@ -39,6 +40,9 @@
 - AI 返回的命令只作为人工排查建议
 - dry-run 只用于本地预览日志内容，不触发后端分析流程
 - dry-run 不会生成报告
+- 当前只是提供 cron 使用说明
+- 项目没有自动写入 crontab
+- 项目没有新增后台常驻采集进程
 
 ## 4. 测试记录
 
@@ -150,7 +154,7 @@ python scripts/collect_recent_logs.py \
 
 以下内容只是后续方向，本阶段暂不实现：
 
-- 使用 cron 定时执行 `collect_recent_logs.py`
+- 已补充 cron 定时执行说明，后续可根据需要进一步封装部署方式
 - 支持 tail -f 增量采集
 - 支持 Docker 容器日志采集
 - 接入 Prometheus Alertmanager Webhook
