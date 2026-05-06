@@ -4,9 +4,10 @@ from pathlib import Path
 from fastapi import FastAPI
 from dotenv import load_dotenv
 
-from app.schemas.request_schema import AnalyzeRequest
+from app.schemas.request_schema import AnalyzeRequest, IngestLogRequest
 from app.services.ai_analysis_service import analyze_log_with_ai
 from app.services.analyze_service import analyze_log
+from app.services.ingest_service import ingest_log
 from app.services.qwen_client import test_qwen_connection
 from app.services.report_service import (
     generate_ai_markdown_report,
@@ -71,7 +72,7 @@ def analyze_ai_report_save(request: AnalyzeRequest) -> dict:
     rule_result = result.get("rule_result") or {}
     ai_result = result.get("ai_result") or {}
     markdown_report = generate_ai_markdown_report(result)
-    report_path = save_report_to_file(markdown_report, result.get("log_type", request.log_type))
+    report_path = save_report_to_file(markdown_report, log_type=result.get("log_type", request.log_type))
 
     response = {
         "log_type": result.get("log_type", request.log_type),
@@ -102,3 +103,8 @@ def config_check() -> dict:
 @app.get("/qwen/test")
 def qwen_test() -> dict:
     return test_qwen_connection()
+
+
+@app.post("/logs/ingest")
+def logs_ingest(request: IngestLogRequest) -> dict:
+    return ingest_log(request)

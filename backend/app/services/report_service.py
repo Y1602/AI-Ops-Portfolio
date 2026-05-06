@@ -1,6 +1,7 @@
 import re
 from datetime import datetime
 from pathlib import Path
+from typing import Optional
 
 
 DANGEROUS_COMMAND_KEYWORDS = [
@@ -69,7 +70,7 @@ def generate_markdown_report(result: dict) -> str:
     return "\n".join(lines)
 
 
-def generate_ai_markdown_report(result: dict) -> str:
+def generate_ai_markdown_report(result: dict, metadata: Optional[dict] = None) -> str:
     try:
         log_type = result.get("log_type", "unknown")
         rule_result = result.get("rule_result") or {}
@@ -77,6 +78,7 @@ def generate_ai_markdown_report(result: dict) -> str:
         rule_severity = rule_result.get("severity", "unknown")
         ai_risk_level = ai_result.get("risk_level", "unknown")
         need_manual_intervention = ai_result.get("need_manual_intervention", "unknown")
+        metadata = metadata or {}
 
         lines = [
             "# AI-OpsLog 智能日志分析报告",
@@ -84,13 +86,27 @@ def generate_ai_markdown_report(result: dict) -> str:
             "## 1. 基本信息",
             "",
             f"- 日志类型：{log_type}",
-            f"- 规则风险等级：{rule_severity}",
-            f"- AI 风险等级：{ai_risk_level}",
-            f"- 是否需要人工介入：{need_manual_intervention}",
-            "",
-            "## 2. 规则解析结果",
-            "",
         ]
+
+        if metadata:
+            lines.extend(
+                [
+                    f"- 日志来源：{metadata.get('source', 'unknown')}",
+                    f"- 服务名称：{metadata.get('service_name', 'unknown')}",
+                    f"- 运行环境：{metadata.get('env', 'unknown')}",
+                ]
+            )
+
+        lines.extend(
+            [
+                f"- 规则风险等级：{rule_severity}",
+                f"- AI 风险等级：{ai_risk_level}",
+                f"- 是否需要人工介入：{need_manual_intervention}",
+                "",
+                "## 2. 规则解析结果",
+                "",
+            ]
+        )
 
         lines.extend(_format_rule_result(rule_result))
         lines.extend(["", "## 3. AI 故障摘要", ""])
@@ -155,6 +171,8 @@ def generate_ai_markdown_report(result: dict) -> str:
 def save_report_to_file(
     markdown_report: str,
     log_type: str = "unknown",
+    source: Optional[str] = None,
+    service_name: Optional[str] = None,
     output_dir: str = "reports",
 ) -> str:
     try:
@@ -166,8 +184,14 @@ def save_report_to_file(
         output_path.mkdir(parents=True, exist_ok=True)
 
         safe_log_type = _safe_filename_part(log_type)
+        filename_parts = ["ai_opslog", safe_log_type]
+        if source:
+            filename_parts.append(_safe_filename_part(source))
+        if service_name:
+            filename_parts.append(_safe_filename_part(service_name))
+        filename_parts.append("report")
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        base_name = f"ai_opslog_{safe_log_type}_report_{timestamp}"
+        base_name = f"{'_'.join(filename_parts)}_{timestamp}"
         report_path = output_path / f"{base_name}.md"
 
         counter = 1
@@ -261,8 +285,10 @@ def _filter_safe_commands(commands) -> list[str]:
 
 
 def _safe_filename_part(value: str) -> str:
-    safe_value = re.sub(r"[^a-zA-Z0-9_-]+", "_", str(value).strip())
-    return safe_value.strip("_") or "unknown"
+    safe_value = str(value).strip().replace(" ", "-")
+    safe_value = re.sub(r'[\\/:*?"<>|]+', "-", safe_value)
+    safe_value = re.sub(r"[^a-zA-Z0-9_.-]+", "-", safe_value)
+    return safe_value.strip("-._") or "unknown"
 
 
 def _to_project_relative_path(project_root: Path, report_path: Path) -> str:
