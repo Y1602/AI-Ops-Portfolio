@@ -141,6 +141,29 @@ curl -s -X POST "http://127.0.0.1:8000/logs/ingest" \
 - 建议排查命令：ss -lntp, docker ps -a
 ```
 
+### 定时采集最近日志
+
+`scripts/collect_recent_logs.py` 用于读取指定日志文件最后 N 行，并发送到 AI-OpsLog 服务端。
+
+```bash
+python scripts/collect_recent_logs.py \
+  --server http://127.0.0.1:8000 \
+  --source nginx-web-01 \
+  --service-name nginx \
+  --env dev \
+  --log-type nginx_error \
+  --file examples/nginx_error_502.log \
+  --lines 50
+```
+
+说明：
+
+- 当前脚本是“手动执行一次采集”
+- 可以结合 cron 定时执行
+- 当前不是实时 tail -f
+- 不会自动执行修复命令
+- 不会读取敏感文件
+
 ## 8. 安全边界
 
 - 本系统不会自动执行任何系统命令。

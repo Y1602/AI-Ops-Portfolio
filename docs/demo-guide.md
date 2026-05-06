@@ -56,6 +56,25 @@ ls -lh reports/
 cat reports/生成的报告文件名.md
 ```
 
+### 使用 collect_recent_logs.py 采集最近 N 行日志
+
+```bash
+python scripts/collect_recent_logs.py \
+  --server http://127.0.0.1:8000 \
+  --source nginx-web-01 \
+  --service-name nginx \
+  --env dev \
+  --log-type nginx_error \
+  --file examples/nginx_error_502.log \
+  --lines 50
+```
+
+然后查看报告：
+
+```bash
+ls -lh reports/
+```
+
 ## 7. 检查报告目录挂载
 
 ```bash
