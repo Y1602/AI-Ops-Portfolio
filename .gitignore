@@ -13,3 +13,5 @@ env/
 .ruff_cache/
 *.log
 !examples/*.log
+reports/*.md
+!reports/README.md

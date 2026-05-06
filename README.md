@@ -2,7 +2,7 @@
 
 AI-OpsLog 是一个运维日志分析助手 Demo 项目。当前版本实现 FastAPI 后端服务：接收外部服务日志、规则解析日志、调用阿里云百炼 / 通义千问 DashScope OpenAI 兼容接口辅助分析，并生成 Markdown 故障分析报告。
 
-当前 Demo 不包含前端、数据库、Docker 化，也不会自动执行任何系统命令。
+当前 Demo 不包含前端和数据库，不会自动执行任何系统命令。
 
 ## 支持的日志类型
 
@@ -10,11 +10,12 @@ AI-OpsLog 是一个运维日志分析助手 Demo 项目。当前版本实现 Fas
 - `nginx_error`: Nginx error.log
 - `docker_log`: Docker 或容器运行日志
 
-## 安装依赖
+## 本地启动
 
 ```bash
 cd backend
 pip install -r requirements.txt
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 ## 配置通义千问 API Key
@@ -43,11 +44,68 @@ QWEN_MODEL=qwen-plus
 
 `.env` 已被 `.gitignore` 忽略，不要将真实 `DASHSCOPE_API_KEY` 提交到 GitHub。
 
-## 启动服务
+## 使用 Docker Compose 启动
+
+1. 复制环境变量文件：
 
 ```bash
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+cp .env.example .env
 ```
+
+2. 编辑 `.env`，填入自己的通义千问 API Key：
+
+```env
+DASHSCOPE_API_KEY=your_dashscope_api_key_here
+DASHSCOPE_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
+QWEN_MODEL=qwen-plus
+```
+
+3. 构建并启动服务：
+
+```bash
+docker compose up -d --build
+```
+
+4. 查看容器状态：
+
+```bash
+docker compose ps
+```
+
+5. 查看日志：
+
+```bash
+docker compose logs -f ai-opslog-backend
+```
+
+6. 测试健康检查：
+
+```bash
+curl -s http://127.0.0.1:8000/health | python -m json.tool
+```
+
+7. 测试通义千问连接：
+
+```bash
+curl -s http://127.0.0.1:8000/qwen/test | python -m json.tool
+```
+
+8. 测试日志接收接口：
+
+```bash
+curl -s -X POST "http://127.0.0.1:8000/logs/ingest" \
+  -H "Content-Type: application/json" \
+  -d '{"source":"docker-host-01","service_name":"redis-container","env":"dev","log_type":"docker_log","log_text":"Error response from daemon: port is already allocated\ncontainer exited with code 1"}' \
+  | python -m json.tool
+```
+
+9. 查看报告：
+
+```bash
+ls -lh reports/
+```
+
+`reports/` 会挂载到容器内 `/app/reports`，容器生成的 Markdown 报告会持久化到宿主机。
 
 ## 接口说明
 
@@ -63,33 +121,6 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 ## 日志接收接口
 
-`POST /logs/ingest`
-
-用途：接收外部服务发送的日志，自动完成规则解析、通义千问分析、Markdown 报告生成和保存。
-
-请求示例：
-
-```json
-{
-  "source": "docker-host-01",
-  "service_name": "redis-container",
-  "env": "dev",
-  "log_type": "docker_log",
-  "log_text": "Error response from daemon: port is already allocated\ncontainer exited with code 1"
-}
-```
-
-测试命令：
-
-```bash
-curl -s -X POST "http://127.0.0.1:8000/logs/ingest" \
-  -H "Content-Type: application/json" \
-  -d '{"source":"docker-host-01","service_name":"redis-container","env":"dev","log_type":"docker_log","log_text":"Error response from daemon: port is already allocated\ncontainer exited with code 1"}' \
-  | python -m json.tool
-```
-
-也可以使用 `examples/ingest_payload_docker.json` 测试：
-
 ```bash
 curl -s -X POST "http://127.0.0.1:8000/logs/ingest" \
   -H "Content-Type: application/json" \
@@ -97,51 +128,18 @@ curl -s -X POST "http://127.0.0.1:8000/logs/ingest" \
   | python -m json.tool
 ```
 
-查看报告：
+字段说明：
 
-```bash
-ls -lh reports/
-```
-
-说明：
-
-- `/logs/ingest` 用于模拟接收外部服务日志。
-- `source` 用于标记日志来源主机或节点。
-- `service_name` 用于标记服务名称。
-- `log_type` 用于选择对应解析器。
-- `env` 用于标记运行环境。
-- AI-OpsLog 只接收和分析日志，不会自动执行任何系统命令。
-
-## 保存 AI Markdown 报告
-
-```bash
-curl -s -X POST "http://127.0.0.1:8000/analyze/ai/report/save" \
-  -H "Content-Type: application/json" \
-  -d '{"log_type":"docker_log","log_text":"Error response from daemon: port is already allocated\ncontainer exited with code 1"}' \
-  | python -m json.tool
-```
-
-保存后查看：
-
-```bash
-ls -lh reports/
-cat reports/生成的报告文件名.md
-```
-
-如果中文显示异常，请确保终端编码为 UTF-8。
-
-## 测试通义千问连接
-
-```bash
-curl -s http://127.0.0.1:8000/qwen/test | python -m json.tool
-```
-
-如果返回 `success=true`，说明通义千问连接正常。
+- `source`: 日志来源主机或节点
+- `service_name`: 服务名称
+- `log_type`: 选择对应解析器
+- `env`: 运行环境
+- `log_text`: 多行日志内容
 
 ## 安全说明
 
 - 本项目不会自动执行任何系统命令。
 - AI 返回的 `related_commands` 只作为人工排查建议。
 - AI 分析结果不能直接作为生产环境操作依据。
-- `DASHSCOPE_API_KEY` 不应提交到 GitHub。
+- `DASHSCOPE_API_KEY` 不应提交到 GitHub，也不会写入镜像。
 

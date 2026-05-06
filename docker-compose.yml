@@ -1,0 +1,14 @@
+services:
+  ai-opslog-backend:
+    build:
+      context: ./backend
+    container_name: ai-opslog-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - DASHSCOPE_API_KEY=${DASHSCOPE_API_KEY}
+      - DASHSCOPE_BASE_URL=${DASHSCOPE_BASE_URL}
+      - QWEN_MODEL=${QWEN_MODEL}
+    volumes:
+      - ./reports:/app/reports
+    restart: unless-stopped
