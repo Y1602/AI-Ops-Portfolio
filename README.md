@@ -4,12 +4,6 @@ AI-OpsLog 是一个运维日志分析助手 Demo 项目。当前版本实现 Fas
 
 当前 Demo 不包含前端和数据库，不会自动执行任何系统命令。
 
-## 支持的日志类型
-
-- `nginx_access`: Nginx access.log
-- `nginx_error`: Nginx error.log
-- `docker_log`: Docker 或容器运行日志
-
 ## 本地启动
 
 ```bash
@@ -18,60 +12,77 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-## 配置通义千问 API Key
+本地直接运行可以不设置 `REPORTS_DIR`，默认保存到项目根目录 `reports/`。
 
-```bash
-cp .env.example .env
-```
-
-编辑项目根目录下的 `.env`：
-
-```env
-DASHSCOPE_API_KEY=your_dashscope_api_key_here
-DASHSCOPE_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
-QWEN_MODEL=qwen-plus
-```
-
-`.env` 已被 `.gitignore` 忽略，不要将真实 `DASHSCOPE_API_KEY` 提交到 GitHub。
-
-## 使用 Docker Compose 启动
+## Docker Compose 启动
 
 ```bash
 cp .env.example .env
 docker compose up -d --build
 ```
 
-查看容器状态：
+Docker Compose 中使用：
 
-```bash
-docker compose ps
+```text
+./reports:/app/reports
 ```
 
-查看日志：
+容器内报告保存路径：
 
-```bash
-docker compose logs -f ai-opslog-backend
+```text
+/app/reports
 ```
 
-测试健康检查：
+宿主机报告保存路径：
+
+```text
+./reports
+```
+
+Docker Compose 会设置：
+
+```env
+REPORTS_DIR=/app/reports
+```
+
+## 常用检查
+
+健康检查：
 
 ```bash
 curl -s http://127.0.0.1:8000/health | python -m json.tool
 ```
 
-测试通义千问连接：
+通义千问连接：
 
 ```bash
 curl -s http://127.0.0.1:8000/qwen/test | python -m json.tool
 ```
 
-`reports/` 会挂载到容器内 `/app/reports`，容器生成的 Markdown 报告会持久化到宿主机。
+检查报告目录：
+
+```bash
+curl -s http://127.0.0.1:8000/reports/check | python -m json.tool
+```
+
+查看宿主机报告：
+
+```bash
+ls -lh reports/
+```
+
+查看容器内报告：
+
+```bash
+docker exec -it ai-opslog-backend ls -lh /app/reports
+```
 
 ## 接口说明
 
 - `GET /health`: 健康检查
 - `GET /config/check`: 检查 DashScope 配置是否已加载，不返回 API Key 原文
 - `GET /qwen/test`: 测试通义千问连接
+- `GET /reports/check`: 检查当前报告目录状态，不读取报告正文
 - `POST /analyze`: 规则解析接口
 - `POST /analyze/report`: 规则解析 Markdown 报告接口
 - `POST /analyze/ai`: 通义千问辅助分析接口
@@ -79,7 +90,7 @@ curl -s http://127.0.0.1:8000/qwen/test | python -m json.tool
 - `POST /analyze/ai/report/save`: 生成 AI 日志分析报告，并保存到 `reports/` 目录
 - `POST /logs/ingest`: 接收外部服务日志，自动完成规则解析、通义千问分析、Markdown 报告生成和保存
 
-## 日志接收接口
+## 日志接收测试
 
 ```bash
 curl -s -X POST "http://127.0.0.1:8000/logs/ingest" \
@@ -88,15 +99,7 @@ curl -s -X POST "http://127.0.0.1:8000/logs/ingest" \
   | python -m json.tool
 ```
 
-字段说明：
-
-- `source`: 日志来源主机或节点
-- `service_name`: 服务名称
-- `log_type`: 选择对应解析器
-- `env`: 运行环境
-- `log_text`: 多行日志内容
-
-## 使用日志发送脚本模拟外部服务接入
+## 日志发送脚本
 
 安装客户端依赖：
 
@@ -115,34 +118,6 @@ python scripts/send_log.py \
   --log-type docker_log \
   --file examples/docker_port_conflict.log
 ```
-
-发送 Nginx Error 日志：
-
-```bash
-python scripts/send_log.py \
-  --server http://127.0.0.1:8000 \
-  --source nginx-web-01 \
-  --service-name nginx \
-  --env dev \
-  --log-type nginx_error \
-  --file examples/nginx_error_502.log
-```
-
-说明：
-
-- 该脚本用于模拟外部服务器向 AI-OpsLog 发送日志。
-- 当前不是实时采集。
-- 后续可以扩展为定时读取日志或 `tail -f` 增量采集。
-- AI-OpsLog 只负责接收、分析、生成报告，不会自动执行任何系统命令。
-
-## 查看报告
-
-```bash
-ls -lh reports/
-cat reports/生成的报告文件名.md
-```
-
-如果中文显示异常，请确保终端编码为 UTF-8。
 
 ## 安全说明
 

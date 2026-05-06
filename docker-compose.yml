@@ -8,6 +8,7 @@ services:
       - DASHSCOPE_API_KEY=${DASHSCOPE_API_KEY}
       - DASHSCOPE_BASE_URL=${DASHSCOPE_BASE_URL}
       - QWEN_MODEL=${QWEN_MODEL}
+      - REPORTS_DIR=/app/reports
     volumes:
       - ./reports:/app/reports
     restart: unless-stopped

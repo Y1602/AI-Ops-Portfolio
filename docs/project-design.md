@@ -2,67 +2,39 @@
 
 ## 项目背景
 
-运维排障过程中，Nginx、Docker、应用容器等日志通常分散且格式不统一。AI-OpsLog 的目标是提供一个轻量的日志分析助手 Demo，将常见日志文本解析为结构化 JSON，并结合规则报告与通义千问辅助分析能力，帮助运维人员更快整理故障线索。
+AI-OpsLog 是一个轻量级运维日志分析 Demo，用于接收外部服务日志，进行规则解析，调用通义千问辅助分析，并生成 Markdown 故障分析报告。
 
-## Demo 阶段目标
+## 当前能力
 
-- 提供一个简单可运行的 FastAPI 后端服务。
-- 支持外部服务通过 HTTP POST 提交日志。
-- 支持根据日志类型分发到对应解析器。
-- 支持规则解析结果返回结构化 JSON。
-- 支持规则解析 Markdown 报告生成。
-- 支持通义千问 AI 辅助分析。
-- 支持 AI 分析 Markdown 报告生成。
-- 支持将 AI 分析结果保存为 Markdown 报告。
-- 支持通过 Docker Compose 启动后端服务。
-- 支持通过脚本模拟外部服务器发送日志。
-- 不依赖数据库或前端。
-- 不自动执行任何系统命令。
+- FastAPI 后端服务。
+- `/logs/ingest` 外部日志接收接口。
+- Nginx access、Nginx error、Docker log 三类规则解析器。
+- 通义千问 AI 辅助分析。
+- Markdown 报告生成与保存。
+- `reports/` 目录沉淀典型故障报告。
+- Docker Compose 部署。
+- `scripts/send_log.py` 模拟外部服务发送日志。
 
-## 当前支持范围
+## 报告持久化设计
 
-- Nginx access.log
-  - 识别客户端 IP、HTTP 方法、请求路径和状态码。
-  - 统计状态码分布。
-  - 统计 4xx、5xx 错误数量和错误率。
-  - 识别常见可疑路径，如 `/admin`、`/login`、`/wp-admin`、`/.env`、`/phpmyadmin`。
+AI-OpsLog 在 Docker Compose 模式下通过 volume 将宿主机 `reports/` 目录挂载到容器 `/app/reports`。
 
-- Nginx error.log
-  - 识别 `connect() failed`、`upstream timed out`、`no live upstreams` 等常见错误关键词。
-  - 输出关键词命中次数、样例日志行和严重程度。
+服务内部通过 `REPORTS_DIR` 环境变量指定报告输出目录，避免因相对路径导致报告保存位置不一致。
 
-- Docker 日志
-  - 识别端口冲突、连接失败、权限问题、容器退出等常见错误关键词。
-  - 输出关键词命中次数、样例日志行和严重程度。
+Docker Compose 推荐配置：
 
-- 日志接收能力
-  - `/logs/ingest` 用于模拟外部服务向 AI-OpsLog 发送日志。
-  - 日志来源通过字段区分，而不是通过端口区分。
-  - `source` 表示日志来源主机或节点。
-  - `service_name` 表示服务名称。
-  - `env` 表示环境名称。
-  - `log_type` 表示日志类型，用于选择解析器。
-  - AI-OpsLog 服务本身可以监听统一端口，例如 8000，由不同服务通过 HTTP POST 提交日志。
+```text
+REPORTS_DIR=/app/reports
+./reports:/app/reports
+```
 
-- 日志发送客户端
-  - 当前项目新增 `scripts/send_log.py`，用于模拟外部服务器或容器将日志发送到 AI-OpsLog 服务端。
-  - 当前阶段采用手动执行脚本发送日志，不做复杂实时采集。
-  - 后续可扩展为定时发送最近 N 行日志、`tail -f` 监听新增日志、采集 Docker 容器日志，或接入 Prometheus Alertmanager Webhook。
+本地直接运行时，如果不设置 `REPORTS_DIR`，默认保存到项目根目录 `reports/`。
 
-- 报告生成与沉淀
-  - 支持规则解析 Markdown 报告。
-  - 支持规则解析结果与通义千问分析结果合并生成 AI Markdown 报告。
-  - 支持将 AI 分析结果保存为 Markdown 报告。
-  - `reports/` 目录用于沉淀典型故障案例。
-  - AI 报告会过滤常见高风险命令，仅保留人工排查参考信息。
+`GET /reports/check` 用于检查当前报告目录是否存在、是否可写，以及当前 `.md` 报告数量。该接口不会读取报告正文，也不会返回任何 API Key。
 
 ## Docker 化部署
 
-当前项目支持通过 Docker Compose 启动 AI-OpsLog 后端服务。
-
 部署后服务监听 `8000` 端口，对外提供日志接收与分析接口。
-
-`reports/` 目录通过 volume 挂载到宿主机，容器内生成的 Markdown 报告会持久化保存到宿主机 `reports/` 目录。
 
 环境变量通过 `.env` 文件传入，避免将 `DASHSCOPE_API_KEY` 写入代码或镜像。
 
@@ -73,18 +45,11 @@
 - 不支持自动修复。
 - 不支持自动执行命令。
 - 不支持生产环境日志采集 Agent。
-- 不做复杂日志格式自动识别。
-- 不做跨文件日志关联分析。
-- 不做用户认证、权限控制或多租户。
 
 ## 后续计划
 
-- 增加更多日志类型，如 Linux syslog、Kubernetes events、应用错误日志。
-- 增加更严格的请求参数校验。
-- 引入统一的错误码和响应格式。
+- 增加更多日志类型。
 - 支持日志文件上传。
-- 增加日志采集脚本。
-- 支持定时提交日志。
+- 增加定时提交日志能力。
 - 支持 `tail -f` 增量日志采集。
-- 后续可接入 Prometheus Alertmanager Webhook。
-- 将 `reports/` 中的典型故障报告整理为项目展示案例。
+- 接入 Prometheus Alertmanager Webhook。

@@ -10,6 +10,7 @@ from app.services.analyze_service import analyze_log
 from app.services.ingest_service import ingest_log
 from app.services.qwen_client import test_qwen_connection
 from app.services.report_service import (
+    check_reports_dir,
     generate_ai_markdown_report,
     generate_markdown_report,
     save_report_to_file,
@@ -103,6 +104,11 @@ def config_check() -> dict:
 @app.get("/qwen/test")
 def qwen_test() -> dict:
     return test_qwen_connection()
+
+
+@app.get("/reports/check")
+def reports_check() -> dict:
+    return check_reports_dir()
 
 
 @app.post("/logs/ingest")

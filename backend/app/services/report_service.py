@@ -1,3 +1,4 @@
+import os
 import re
 from datetime import datetime
 from pathlib import Path
@@ -177,9 +178,7 @@ def save_report_to_file(
 ) -> str:
     try:
         project_root = Path(__file__).resolve().parents[3]
-        output_path = Path(output_dir)
-        if not output_path.is_absolute():
-            output_path = project_root / output_path
+        output_path = get_reports_dir(output_dir)
 
         output_path.mkdir(parents=True, exist_ok=True)
 
@@ -203,6 +202,29 @@ def save_report_to_file(
         return _to_project_relative_path(project_root, report_path)
     except Exception as exc:
         return f"failed to save report: {exc}"
+
+
+def get_reports_dir(output_dir: str = "reports") -> Path:
+    reports_dir = Path(os.getenv("REPORTS_DIR", output_dir))
+    if reports_dir.is_absolute():
+        return reports_dir
+
+    project_root = Path(__file__).resolve().parents[3]
+    return project_root / reports_dir
+
+
+def check_reports_dir(output_dir: str = "reports") -> dict:
+    reports_dir = get_reports_dir(output_dir)
+    exists = reports_dir.exists() and reports_dir.is_dir()
+    writable = os.access(reports_dir, os.W_OK) if exists else os.access(reports_dir.parent, os.W_OK)
+    report_count = len(list(reports_dir.glob("*.md"))) if exists else 0
+
+    return {
+        "reports_dir": str(reports_dir),
+        "exists": exists,
+        "writable": writable,
+        "report_count": report_count,
+    }
 
 
 def _format_rule_result(rule_result: dict) -> list[str]:
