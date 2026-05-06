@@ -1,6 +1,6 @@
 # AI-OpsLog Backend
 
-这是 AI-OpsLog 的 FastAPI 后端 Demo。当前提供 `/health`、`/analyze`、`/analyze/report` 和 `/analyze/ai` 接口，用于验证服务状态、规则解析日志、生成 Markdown 报告，以及调用阿里云百炼 / 通义千问 DashScope OpenAI 兼容接口进行辅助故障分析。
+这是 AI-OpsLog 的 FastAPI 后端 Demo。当前提供 `/health`、`/config/check`、`/analyze`、`/analyze/report` 和 `/analyze/ai` 接口，用于验证服务状态、检查 DashScope 配置、规则解析日志、生成 Markdown 报告，以及调用阿里云百炼 / 通义千问 DashScope OpenAI 兼容接口进行辅助故障分析。
 
 当前后端不包含前端、数据库、Docker 化，也不会自动执行任何系统命令。
 
@@ -10,11 +10,11 @@
 pip install -r requirements.txt
 ```
 
-## 通义千问 AI 分析接口
+## 配置通义千问 API Key
 
 本项目使用阿里云百炼 / 通义千问 DashScope OpenAI 兼容接口。虽然依赖 `openai` Python SDK，但实际调用的是 DashScope 兼容接口，不是 OpenAI 官方服务。
 
-需要配置环境变量：
+方式一：使用环境变量
 
 ```bash
 export DASHSCOPE_API_KEY="your_dashscope_api_key_here"
@@ -30,7 +30,23 @@ $env:DASHSCOPE_BASE_URL="https://dashscope.aliyuncs.com/compatible-mode/v1"
 $env:QWEN_MODEL="qwen-plus"
 ```
 
-也可以在项目根目录创建本地 `.env` 文件，内容参考 `.env.example`。不要提交真实 API Key。
+方式二：使用 `.env` 文件
+
+在项目根目录执行：
+
+```bash
+cp .env.example .env
+```
+
+然后编辑 `.env`：
+
+```env
+DASHSCOPE_API_KEY=your_dashscope_api_key_here
+DASHSCOPE_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
+QWEN_MODEL=qwen-plus
+```
+
+系统环境变量优先级高于 `.env`。`.env` 已被 `.gitignore` 忽略，不要提交真实 API Key。
 
 ## 启动
 
@@ -47,15 +63,16 @@ http://127.0.0.1:8000
 ## 接口
 
 - `GET /health`: 健康检查
+- `GET /config/check`: 检查 DashScope 配置是否已加载，不会返回 API Key 原文
 - `POST /analyze`: 规则解析接口
 - `POST /analyze/report`: 规则报告接口，返回 Markdown 报告
 - `POST /analyze/ai`: 通义千问辅助分析接口，返回结构化故障分析 JSON
 
-安全说明：
+## 检查配置是否生效
 
-- 本项目不会自动执行任何系统命令。
-- AI 输出的命令只作为人工排查建议。
-- AI 分析结果需要人工确认，不能直接作为生产环境操作依据。
+```bash
+curl -s http://127.0.0.1:8000/config/check | python -m json.tool
+```
 
 ## curl 测试
 
@@ -79,7 +96,7 @@ curl -s -X POST "http://127.0.0.1:8000/analyze/report" \
   | python -m json.tool
 ```
 
-通义千问 AI 分析接口：
+测试 AI 分析接口：
 
 ```bash
 curl -s -X POST "http://127.0.0.1:8000/analyze/ai" \
@@ -88,5 +105,10 @@ curl -s -X POST "http://127.0.0.1:8000/analyze/ai" \
   | python -m json.tool
 ```
 
-如果系统安装了 `jq`，也可以将 `python -m json.tool` 替换为 `jq`。
+## 安全说明
+
+- 本项目不会自动执行任何系统命令。
+- AI 返回的 `related_commands` 只作为人工排查建议。
+- AI 分析结果不能直接作为生产环境操作依据。
+- `DASHSCOPE_API_KEY` 不应提交到 GitHub。
 
