@@ -1,0 +1,5 @@
+2026/05/06 10:01:00 [error] 18#18: *102 connect() failed (111: Connection refused) while connecting to upstream, client: 192.168.1.20, server: example.com, request: "GET /api/orders HTTP/1.1", upstream: "http://10.0.0.5:8080/api/orders"
+2026/05/06 10:01:05 [error] 18#18: *103 upstream timed out (110: Connection timed out) while reading response header from upstream, client: 192.168.1.21, server: example.com, request: "GET /api/report HTTP/1.1"
+2026/05/06 10:01:08 [warn] 18#18: *104 an upstream response is buffered to a temporary file
+2026/05/06 10:01:12 [error] 18#18: *105 no live upstreams while connecting to upstream, client: 192.168.1.22, server: example.com, request: "GET /api/payment HTTP/1.1"
+

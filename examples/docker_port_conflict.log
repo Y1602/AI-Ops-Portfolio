@@ -1,0 +1,6 @@
+Creating ai-opslog-api ... error
+ERROR: for ai-opslog-api  Cannot start service api: driver failed programming external connectivity on endpoint ai-opslog-api: Bind for 0.0.0.0:8000 failed: port is already allocated
+api_1  | Starting application
+api_1  | Error: connection refused while connecting to http://redis:6379
+ai-opslog-api exited with code 1
+
