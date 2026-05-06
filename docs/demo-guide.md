@@ -84,3 +84,137 @@ curl -s http://127.0.0.1:8000/reports/check | python -m json.tool
 ```bash
 docker exec -it ai-opslog-backend ls -lh /app/reports
 ```
+
+# 第二阶段 Demo：采集最近 N 行日志并生成分析报告
+
+## 1. 启动服务
+
+```bash
+docker compose up -d
+```
+
+## 2. 检查服务状态
+
+```bash
+curl http://127.0.0.1:8000/health
+```
+
+## 3. 执行最近日志采集脚本
+
+```bash
+python scripts/collect_recent_logs.py \
+  --server http://127.0.0.1:8000 \
+  --source nginx-web-01 \
+  --service-name nginx \
+  --env dev \
+  --log-type nginx_error \
+  --file examples/nginx_error_502.log \
+  --lines 50
+```
+
+## dry-run 预览模式
+
+dry-run 模式用于在真正发送日志到后端前，先确认脚本读取到的日志内容是否正确。
+
+```bash
+python scripts/collect_recent_logs.py \
+  --server http://127.0.0.1:8000 \
+  --source nginx-web-01 \
+  --service-name nginx \
+  --env dev \
+  --log-type nginx_error \
+  --file examples/nginx_error_502.log \
+  --lines 10 \
+  --dry-run
+```
+
+该模式不会请求 `/logs/ingest`，也不会生成 `reports/` 报告。
+
+## 4. 查看接口返回结果
+
+示例返回结构：
+
+```json
+{
+  "source": "nginx-web-01",
+  "service_name": "nginx",
+  "env": "dev",
+  "log_type": "nginx_error",
+  "rule_severity": "high",
+  "ai_risk_level": "high",
+  "report_path": "app/reports/ai_opslog_nginx_error_nginx-web-01_nginx_report_xxx.md",
+  "message": "log ingested and report generated"
+}
+```
+
+## 5. 查看生成的报告
+
+```bash
+ls -lh reports/
+```
+
+如果 `reports/` 目录下出现新的 `.md` 文件，说明“日志文件读取 → 接口发送 → 规则分析 → AI 分析 → 报告生成”链路已经打通。
+
+## 6. 敏感文件拦截测试
+
+测试 `.env`：
+
+```bash
+python scripts/collect_recent_logs.py \
+  --server http://127.0.0.1:8000 \
+  --source test-host \
+  --service-name test \
+  --env dev \
+  --log-type docker_log \
+  --file .env \
+  --lines 10
+```
+
+预期结果：
+
+```text
+Refuse to read sensitive file: .env
+```
+
+测试 `/etc/passwd`：
+
+```bash
+python scripts/collect_recent_logs.py \
+  --server http://127.0.0.1:8000 \
+  --source test-host \
+  --service-name test \
+  --env dev \
+  --log-type docker_log \
+  --file /etc/passwd \
+  --lines 10
+```
+
+预期结果：
+
+```text
+Refuse to read sensitive file: /etc/passwd
+```
+
+## 7. 异常文件测试
+
+测试不存在的文件：
+
+```bash
+python scripts/collect_recent_logs.py \
+  --server http://127.0.0.1:8000 \
+  --source test-host \
+  --service-name test \
+  --env dev \
+  --log-type docker_log \
+  --file examples/not_exists.log \
+  --lines 10
+```
+
+预期结果：
+
+```json
+{
+  "error": "log file does not exist",
+  "file": "examples/not_exists.log"
+}
+```

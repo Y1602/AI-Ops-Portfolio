@@ -101,6 +101,38 @@ python scripts/send_log.py \
 ls -lh reports/
 ```
 
+## 第二阶段：最近日志采集脚本
+
+AI-OpsLog 第二阶段新增了 `scripts/collect_recent_logs.py`，用于读取指定日志文件最后 N 行内容，并发送到已有的 `POST /logs/ingest` 接口。后端收到日志后，会继续完成规则分析、通义千问 AI 分析，并生成 Markdown 故障分析报告。
+
+使用示例：
+
+```bash
+python scripts/collect_recent_logs.py \
+  --server http://127.0.0.1:8000 \
+  --source nginx-web-01 \
+  --service-name nginx \
+  --env dev \
+  --log-type nginx_error \
+  --file examples/nginx_error_502.log \
+  --lines 50
+```
+
+执行成功后，控制台会返回 `/logs/ingest` 接口响应结果，并在 `reports/` 目录下生成新的 Markdown 故障分析报告。
+
+当前能力边界：
+
+- 当前只支持手动执行一次采集
+- 当前不是实时日志采集器
+- 当前不做 tail -f
+- 当前不做定时任务
+- 当前不做断点续读
+- 当前不做日志去重
+- 当前不做多文件批量采集
+- 当前不执行任何系统命令
+- 当前 AI 返回的命令只作为人工排查建议
+- 当前会拦截敏感文件，例如 `.env`、`id_rsa`、`/etc/passwd`、`/etc/shadow`、`*.pem`、`*.key`
+
 ## 6. API 接口说明
 
 - `GET /health`: 健康检查
@@ -141,36 +173,13 @@ curl -s -X POST "http://127.0.0.1:8000/logs/ingest" \
 - 建议排查命令：ss -lntp, docker ps -a
 ```
 
-### 定时采集最近日志
-
-`scripts/collect_recent_logs.py` 用于读取指定日志文件最后 N 行，并发送到 AI-OpsLog 服务端。
-
-```bash
-python scripts/collect_recent_logs.py \
-  --server http://127.0.0.1:8000 \
-  --source nginx-web-01 \
-  --service-name nginx \
-  --env dev \
-  --log-type nginx_error \
-  --file examples/nginx_error_502.log \
-  --lines 50
-```
-
-说明：
-
-- 当前脚本是“手动执行一次采集”
-- 可以结合 cron 定时执行
-- 当前不是实时 tail -f
-- 不会自动执行修复命令
-- 不会读取敏感文件
-
 ## 8. 安全边界
 
 - 本系统不会自动执行任何系统命令。
 - AI 输出的命令只作为人工排查参考。
 - AI 分析结果不能直接作为生产环境操作依据。
 - API Key 通过环境变量或 `.env` 注入，不应提交到 GitHub。
-- 当前项目定位为 Demo / 学习项目，不是生产级 AIOps 平台。
+- 当前项目定位为 Demo / 学习项目，不是完整 AIOps 系统。
 
 ## 9. 后续规划
 

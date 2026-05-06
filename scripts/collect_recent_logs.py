@@ -41,6 +41,11 @@ def parse_args() -> argparse.Namespace:
         default=50,
         help="Number of recent lines to read, default: 50.",
     )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Read and print recent log lines without sending them to the server.",
+    )
     return parser.parse_args()
 
 
@@ -85,6 +90,10 @@ def main() -> int:
         print_json({"error": "path is not a regular file", "file": str(log_file)})
         return 1
 
+    if args.lines <= 0:
+        print_json({"error": "lines must be greater than 0", "lines": args.lines})
+        return 1
+
     try:
         log_text = read_last_lines(str(log_file), args.lines)
     except OSError as exc:
@@ -105,6 +114,12 @@ def main() -> int:
                 "lines": args.lines,
             }
         )
+        return 0
+
+    if args.dry_run:
+        print(f"[DRY-RUN] Read last {args.lines} lines from {args.file}")
+        print("[DRY-RUN] The following log content will not be sent to server:")
+        print(log_text)
         return 0
 
     payload = {
