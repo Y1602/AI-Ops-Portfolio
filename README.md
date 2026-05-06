@@ -159,6 +159,56 @@ python scripts/collect_recent_logs.py \
 ...
 ```
 
+### output-log 运行日志
+
+`--output-log` 用于记录 `collect_recent_logs.py` 每次运行结果，适合配合 cron 查看采集任务是否执行成功。
+
+需要区分：
+
+- `reports/` 是 AI 分析生成的 Markdown 故障报告目录
+- `logs/` 是采集脚本自身的运行日志目录
+- 两者不要混淆
+
+示例命令：
+
+```bash
+python scripts/collect_recent_logs.py \
+  --server http://127.0.0.1:8000 \
+  --source nginx-web-01 \
+  --service-name nginx \
+  --env dev \
+  --log-type nginx_error \
+  --file examples/nginx_error_502.log \
+  --lines 50 \
+  --output-log logs/collect_recent_logs.log
+```
+
+示例运行日志：
+
+```text
+[2026-05-06 23:21:14] status=success source=nginx-web-01 service=nginx env=dev log_type=nginx_error file=examples/nginx_error_502.log lines=50 max_chars=20000 dry_run=false truncated=false report_path=app/reports/ai_opslog_nginx_error_nginx-web-01_nginx_report_xxx.md
+```
+
+### max-chars 内容长度限制
+
+`--max-chars` 用于限制最终发送给后端或 dry-run 展示的日志内容长度，默认值为 `20000`。
+
+如果日志内容超过 `max_chars`，脚本会保留最后 `max_chars` 个字符，并在日志内容前添加 `[TRUNCATED]` 提示。
+
+示例命令：
+
+```bash
+python scripts/collect_recent_logs.py \
+  --server http://127.0.0.1:8000 \
+  --source nginx-web-01 \
+  --service-name nginx \
+  --env dev \
+  --log-type nginx_error \
+  --file examples/nginx_error_502.log \
+  --lines 200 \
+  --max-chars 5000
+```
+
 当前能力边界：
 
 - 当前只支持手动执行一次采集

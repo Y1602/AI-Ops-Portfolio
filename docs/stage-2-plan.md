@@ -19,6 +19,13 @@
 - 支持 `--lines` 参数指定读取行数
 - 支持 `--dry-run` 预览模式
 - 支持在不发送后端请求的情况下预览最近 N 行日志内容
+- 支持 `--output-log` 记录采集脚本运行结果
+- 支持记录 `success`、`failed`、`dry-run`、`report_path`、`error` 等信息
+- 支持配合 cron 排查定时任务是否执行成功
+- 支持 `--max-chars` 限制日志内容长度
+- 支持在日志过长时保留末尾内容
+- 支持在截断内容前添加 `[TRUNCATED]` 提示
+- 支持 output-log 记录 `max_chars` 和 `truncated` 状态
 - 支持敏感文件拦截
 - 支持文件不存在时返回错误信息
 - 支持空内容处理
@@ -43,6 +50,14 @@
 - 当前只是提供 cron 使用说明
 - 项目没有自动写入 crontab
 - 项目没有新增后台常驻采集进程
+- `--output-log` 只记录采集脚本自身运行结果
+- `--output-log` 不等于 AI 分析报告
+- `--output-log` 不保存完整业务日志内容
+- `--output-log` 不替代数据库历史记录
+- `--max-chars` 只控制单次发送内容长度
+- `--max-chars` 不等于日志采样策略
+- `--max-chars` 不做日志去重
+- `--max-chars` 不保存完整日志归档
 
 ## 4. 测试记录
 

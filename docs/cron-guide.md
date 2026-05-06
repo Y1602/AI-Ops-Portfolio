@@ -73,17 +73,30 @@ dry-run 模式不会请求 `/logs/ingest`，也不会生成报告。
 每 5 分钟采集一次 Nginx Error 日志最近 50 行：
 
 ```cron
-*/5 * * * * cd /opt/AI-Ops-Portfolio && /usr/bin/python3 scripts/collect_recent_logs.py --server http://127.0.0.1:8000 --source nginx-web-01 --service-name nginx --env dev --log-type nginx_error --file examples/nginx_error_502.log --lines 50 --output-log logs/collect_recent_logs.log
+*/5 * * * * cd /opt/AI-Ops-Portfolio && /usr/bin/python3 scripts/collect_recent_logs.py --server http://127.0.0.1:8000 --source nginx-web-01 --service-name nginx --env dev --log-type nginx_error --file examples/nginx_error_502.log --lines 50 --max-chars 20000 --output-log logs/collect_recent_logs.log
 ```
 
 说明：
 
 - `cd /opt/AI-Ops-Portfolio` 用于切换到项目目录
 - `/usr/bin/python3` 建议使用绝对路径
+- `--max-chars 20000` 可以避免 cron 周期执行时一次性发送过大的日志内容
 - `--output-log logs/collect_recent_logs.log` 用于记录 `collect_recent_logs.py` 每次执行的结果，适合配合 cron 查看采集任务是否成功
 - 如果需要同时记录终端标准输出和错误输出，也可以继续使用 shell 重定向
 - 实际项目路径需要根据部署位置调整
 - 实际日志文件路径需要根据目标服务调整
+
+如果还希望保留终端输出和错误输出，可以使用：
+
+```cron
+*/5 * * * * cd /opt/AI-Ops-Portfolio && /usr/bin/python3 scripts/collect_recent_logs.py --server http://127.0.0.1:8000 --source nginx-web-01 --service-name nginx --env dev --log-type nginx_error --file examples/nginx_error_502.log --lines 50 --max-chars 20000 --output-log logs/collect_recent_logs.log >> logs/collect_recent_stdout.log 2>&1
+```
+
+日志文件用途：
+
+- `collect_recent_logs.log` 记录脚本结构化运行结果
+- `collect_recent_stdout.log` 记录终端标准输出和错误输出
+- 两者用途不同
 
 ## 6. 建议创建 logs/ 目录
 

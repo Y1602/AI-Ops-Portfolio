@@ -43,6 +43,12 @@ def parse_args() -> argparse.Namespace:
         help="Number of recent lines to read, default: 50.",
     )
     parser.add_argument(
+        "--max-chars",
+        type=int,
+        default=20000,
+        help="Maximum log content characters to keep, default: 20000.",
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="Read and print recent log lines without sending them to the server.",
@@ -79,34 +85,87 @@ def read_last_lines(file_path: str, lines: int) -> str:
     return "\n".join(content.splitlines()[-line_count:])
 
 
+def truncate_log_content(log_content: str, max_chars: int) -> tuple[str, bool]:
+    if len(log_content) <= max_chars:
+        return log_content, False
+
+    message = (
+        f"[TRUNCATED] Log content exceeded max_chars={max_chars}, "
+        f"only the last {max_chars} characters are kept."
+    )
+    return message + "\n" + log_content[-max_chars:], True
+
+
 def main() -> int:
     args = parse_args()
     log_file = Path(args.file).expanduser()
+    truncated = False
+
+    if args.max_chars <= 0:
+        append_run_log(
+            args.output_log,
+            args,
+            "failed",
+            truncated=truncated,
+            error="max_chars must be greater than 0",
+        )
+        print("Error: --max-chars must be greater than 0")
+        return 1
 
     if not is_safe_log_file(str(log_file)):
-        append_run_log(args.output_log, args, "failed", error="sensitive file refused")
+        append_run_log(
+            args.output_log,
+            args,
+            "failed",
+            truncated=truncated,
+            error="sensitive file refused",
+        )
         print(f"Refuse to read sensitive file: {args.file}")
         return 1
 
     if not log_file.exists():
-        append_run_log(args.output_log, args, "failed", error="log file does not exist")
+        append_run_log(
+            args.output_log,
+            args,
+            "failed",
+            truncated=truncated,
+            error="log file does not exist",
+        )
         print_json({"error": "log file does not exist", "file": str(log_file)})
         return 1
 
     if not log_file.is_file():
-        append_run_log(args.output_log, args, "failed", error="path is not a regular file")
+        append_run_log(
+            args.output_log,
+            args,
+            "failed",
+            truncated=truncated,
+            error="path is not a regular file",
+        )
         print_json({"error": "path is not a regular file", "file": str(log_file)})
         return 1
 
     if args.lines <= 0:
-        append_run_log(args.output_log, args, "failed", error="lines must be greater than 0")
+        append_run_log(
+            args.output_log,
+            args,
+            "failed",
+            truncated=truncated,
+            error="lines must be greater than 0",
+        )
         print_json({"error": "lines must be greater than 0", "lines": args.lines})
         return 1
 
     try:
         log_text = read_last_lines(str(log_file), args.lines)
     except OSError as exc:
-        append_run_log(args.output_log, args, "failed", error=f"failed to read log file: {exc}")
+        append_run_log(
+            args.output_log,
+            args,
+            "failed",
+            truncated=truncated,
+            error=f"failed to read log file: {exc}",
+        )
         print_json(
             {
                 "error": "failed to read log file",
@@ -117,7 +176,13 @@ def main() -> int:
         return 1
 
     if not log_text.strip():
-        append_run_log(args.output_log, args, "failed", error="no log content was read from file")
+        append_run_log(
+            args.output_log,
+            args,
+            "failed",
+            truncated=truncated,
+            error="no log content was read from file",
+        )
         print_json(
             {
                 "message": "no log content was read from file",
@@ -127,11 +192,19 @@ def main() -> int:
         )
         return 0
 
+    log_text, truncated = truncate_log_content(log_text, args.max_chars)
+
     if args.dry_run:
         print(f"[DRY-RUN] Read last {args.lines} lines from {args.file}")
         print("[DRY-RUN] The following log content will not be sent to server:")
         print(log_text)
-        append_run_log(args.output_log, args, "success", message="dry-run completed")
+        append_run_log(
+            args.output_log,
+            args,
+            "success",
+            truncated=truncated,
+            message="dry-run completed",
+        )
         return 0
 
     payload = {
@@ -150,6 +223,7 @@ def main() -> int:
             args.output_log,
             args,
             "failed",
+            truncated=truncated,
             error=f"failed to connect to AI-OpsLog server: {exc}",
         )
         print_json(
@@ -166,6 +240,7 @@ def main() -> int:
             args.output_log,
             args,
             "failed",
+            truncated=truncated,
             error=f"server returned non-200 status: {response.status_code}",
         )
         print_json(
@@ -180,7 +255,13 @@ def main() -> int:
     try:
         response_data = response.json()
     except ValueError:
-        append_run_log(args.output_log, args, "failed", error="server response is not valid JSON")
+        append_run_log(
+            args.output_log,
+            args,
+            "failed",
+            truncated=truncated,
+            error="server response is not valid JSON",
+        )
         print_json(
             {
                 "error": "server response is not valid JSON",
@@ -193,13 +274,22 @@ def main() -> int:
         args.output_log,
         args,
         "success",
+        truncated=truncated,
         report_path=response_data.get("report_path"),
     )
     print_json(response_data)
     return 0
 
 
-def append_run_log(output_log, args, status, message=None, report_path=None, error=None):
+def append_run_log(
+    output_log,
+    args,
+    status,
+    message=None,
+    report_path=None,
+    error=None,
+    truncated=False,
+):
     if not output_log:
         return
 
@@ -218,7 +308,9 @@ def append_run_log(output_log, args, status, message=None, report_path=None, err
             f"log_type={_format_log_value(args.log_type)}",
             f"file={_format_log_value(args.file)}",
             f"lines={args.lines}",
+            f"max_chars={args.max_chars}",
             f"dry_run={str(args.dry_run).lower()}",
+            f"truncated={str(truncated).lower()}",
         ]
         if report_path:
             fields.append(f"report_path={_format_log_value(report_path)}")
