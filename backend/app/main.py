@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 
 from app.schemas.request_schema import AnalyzeRequest
+from app.services.ai_analysis_service import analyze_log_with_ai
 from app.services.analyze_service import analyze_log
 from app.services.report_service import generate_markdown_report
 
@@ -31,3 +32,8 @@ def analyze_report(request: AnalyzeRequest) -> dict:
         "severity": result.get("severity", "unknown"),
         "markdown_report": generate_markdown_report(result),
     }
+
+
+@app.post("/analyze/ai")
+def analyze_ai(request: AnalyzeRequest) -> dict:
+    return analyze_log_with_ai(request.log_type, request.log_text)
