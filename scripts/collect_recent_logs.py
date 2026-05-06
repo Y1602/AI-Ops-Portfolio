@@ -1,4 +1,5 @@
 import argparse
+from datetime import datetime
 import json
 from pathlib import Path
 
@@ -46,6 +47,10 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Read and print recent log lines without sending them to the server.",
     )
+    parser.add_argument(
+        "--output-log",
+        help="Append this run result to a local log file.",
+    )
     return parser.parse_args()
 
 
@@ -79,24 +84,29 @@ def main() -> int:
     log_file = Path(args.file).expanduser()
 
     if not is_safe_log_file(str(log_file)):
+        append_run_log(args.output_log, args, "failed", error="sensitive file refused")
         print(f"Refuse to read sensitive file: {args.file}")
         return 1
 
     if not log_file.exists():
+        append_run_log(args.output_log, args, "failed", error="log file does not exist")
         print_json({"error": "log file does not exist", "file": str(log_file)})
         return 1
 
     if not log_file.is_file():
+        append_run_log(args.output_log, args, "failed", error="path is not a regular file")
         print_json({"error": "path is not a regular file", "file": str(log_file)})
         return 1
 
     if args.lines <= 0:
+        append_run_log(args.output_log, args, "failed", error="lines must be greater than 0")
         print_json({"error": "lines must be greater than 0", "lines": args.lines})
         return 1
 
     try:
         log_text = read_last_lines(str(log_file), args.lines)
     except OSError as exc:
+        append_run_log(args.output_log, args, "failed", error=f"failed to read log file: {exc}")
         print_json(
             {
                 "error": "failed to read log file",
@@ -107,6 +117,7 @@ def main() -> int:
         return 1
 
     if not log_text.strip():
+        append_run_log(args.output_log, args, "failed", error="no log content was read from file")
         print_json(
             {
                 "message": "no log content was read from file",
@@ -120,6 +131,7 @@ def main() -> int:
         print(f"[DRY-RUN] Read last {args.lines} lines from {args.file}")
         print("[DRY-RUN] The following log content will not be sent to server:")
         print(log_text)
+        append_run_log(args.output_log, args, "success", message="dry-run completed")
         return 0
 
     payload = {
@@ -134,6 +146,12 @@ def main() -> int:
     try:
         response = requests.post(url, json=payload, timeout=60)
     except requests.exceptions.RequestException as exc:
+        append_run_log(
+            args.output_log,
+            args,
+            "failed",
+            error=f"failed to connect to AI-OpsLog server: {exc}",
+        )
         print_json(
             {
                 "error": "failed to connect to AI-OpsLog server",
@@ -144,6 +162,12 @@ def main() -> int:
         return 1
 
     if response.status_code != 200:
+        append_run_log(
+            args.output_log,
+            args,
+            "failed",
+            error=f"server returned non-200 status: {response.status_code}",
+        )
         print_json(
             {
                 "error": "server returned non-200 status",
@@ -154,8 +178,9 @@ def main() -> int:
         return 1
 
     try:
-        print_json(response.json())
+        response_data = response.json()
     except ValueError:
+        append_run_log(args.output_log, args, "failed", error="server response is not valid JSON")
         print_json(
             {
                 "error": "server response is not valid JSON",
@@ -164,7 +189,55 @@ def main() -> int:
         )
         return 1
 
+    append_run_log(
+        args.output_log,
+        args,
+        "success",
+        report_path=response_data.get("report_path"),
+    )
+    print_json(response_data)
     return 0
+
+
+def append_run_log(output_log, args, status, message=None, report_path=None, error=None):
+    if not output_log:
+        return
+
+    try:
+        output_path = Path(output_log).expanduser()
+        if output_path.parent != Path("."):
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        fields = [
+            f"[{timestamp}]",
+            f"status={status}",
+            f"source={_format_log_value(args.source)}",
+            f"service={_format_log_value(args.service_name)}",
+            f"env={_format_log_value(args.env)}",
+            f"log_type={_format_log_value(args.log_type)}",
+            f"file={_format_log_value(args.file)}",
+            f"lines={args.lines}",
+            f"dry_run={str(args.dry_run).lower()}",
+        ]
+        if report_path:
+            fields.append(f"report_path={_format_log_value(report_path)}")
+        if message:
+            fields.append(f"message={_format_log_value(message)}")
+        if error:
+            fields.append(f"error={_format_log_value(error)}")
+
+        with output_path.open("a", encoding="utf-8") as log_file:
+            log_file.write(" ".join(fields) + "\n")
+    except OSError as exc:
+        print(f"Warning: failed to write output log: {exc}")
+
+
+def _format_log_value(value):
+    text = str(value).replace("\n", " ").replace('"', '\\"')
+    if any(char.isspace() for char in text):
+        return f'"{text}"'
+    return text
 
 
 def print_json(data: dict) -> None:
