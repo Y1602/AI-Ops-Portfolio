@@ -1,3 +1,4 @@
+import re
 from datetime import datetime
 from pathlib import Path
 
@@ -63,7 +64,6 @@ def generate_markdown_report(result: dict) -> str:
 
     lines.extend(["", "## 4. 样例日志", ""])
     lines.extend(_format_samples(result))
-
     lines.extend(["", "## 5. 初步建议", "", _get_advice(severity), ""])
 
     return "\n".join(lines)
@@ -97,6 +97,8 @@ def generate_ai_markdown_report(result: dict) -> str:
 
         if isinstance(ai_result, dict) and ai_result.get("error"):
             lines.append(f"- AI 调用失败：{ai_result.get('error')}")
+            if ai_result.get("detail"):
+                lines.append(f"- 错误详情：{ai_result.get('detail')}")
             lines.append("- 当前报告仅包含规则分析结果。")
         else:
             lines.append(str(ai_result.get("summary") or "AI 未返回故障摘要。"))
@@ -150,7 +152,11 @@ def generate_ai_markdown_report(result: dict) -> str:
         )
 
 
-def save_report_to_file(markdown_report: str, output_dir: str = "reports") -> str:
+def save_report_to_file(
+    markdown_report: str,
+    log_type: str = "unknown",
+    output_dir: str = "reports",
+) -> str:
     try:
         project_root = Path(__file__).resolve().parents[3]
         output_path = Path(output_dir)
@@ -158,10 +164,19 @@ def save_report_to_file(markdown_report: str, output_dir: str = "reports") -> st
             output_path = project_root / output_path
 
         output_path.mkdir(parents=True, exist_ok=True)
-        filename = f"ai_opslog_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md"
-        report_path = output_path / filename
+
+        safe_log_type = _safe_filename_part(log_type)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        base_name = f"ai_opslog_{safe_log_type}_report_{timestamp}"
+        report_path = output_path / f"{base_name}.md"
+
+        counter = 1
+        while report_path.exists():
+            report_path = output_path / f"{base_name}_{counter:02d}.md"
+            counter += 1
+
         report_path.write_text(markdown_report, encoding="utf-8")
-        return str(report_path)
+        return _to_project_relative_path(project_root, report_path)
     except Exception as exc:
         return f"failed to save report: {exc}"
 
@@ -243,6 +258,18 @@ def _filter_safe_commands(commands) -> list[str]:
         safe_commands.append(command_text)
 
     return safe_commands
+
+
+def _safe_filename_part(value: str) -> str:
+    safe_value = re.sub(r"[^a-zA-Z0-9_-]+", "_", str(value).strip())
+    return safe_value.strip("_") or "unknown"
+
+
+def _to_project_relative_path(project_root: Path, report_path: Path) -> str:
+    try:
+        return report_path.relative_to(project_root).as_posix()
+    except ValueError:
+        return str(report_path)
 
 
 def _get_advice(severity: str) -> str:

@@ -1,6 +1,6 @@
 # AI-OpsLog Backend
 
-这是 AI-OpsLog 的 FastAPI 后端 Demo。当前提供规则解析、规则 Markdown 报告、通义千问辅助分析、AI Markdown 报告和 Qwen 连通性测试能力。
+这是 AI-OpsLog 的 FastAPI 后端 Demo。当前提供规则解析、规则 Markdown 报告、通义千问辅助分析、AI Markdown 报告、AI 报告保存和 Qwen 连通性测试能力。
 
 当前后端不包含前端、数据库、Docker 化，也不会自动执行任何系统命令。
 
@@ -53,41 +53,45 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 - `POST /analyze/report`: 规则解析 Markdown 报告接口
 - `POST /analyze/ai`: 通义千问辅助分析接口
 - `POST /analyze/ai/report`: AI Markdown 报告接口
+- `POST /analyze/ai/report/save`: 生成 AI 日志分析报告，并保存到 `reports/` 目录
+
+## 保存 AI Markdown 报告
+
+用途：生成 AI 日志分析报告，并保存到 `reports/` 目录。
+
+```bash
+curl -s -X POST "http://127.0.0.1:8000/analyze/ai/report/save" \
+  -H "Content-Type: application/json" \
+  -d '{"log_type":"docker_log","log_text":"Error response from daemon: port is already allocated\ncontainer exited with code 1"}' \
+  | python -m json.tool
+```
+
+查看保存的报告：
+
+```bash
+ls -lh reports/
+cat reports/生成的报告文件名.md
+```
+
+如果中文显示异常，请确保终端编码为 UTF-8。
+
+## 使用示例日志生成报告
+
+建议使用 `examples/` 目录中的日志样例生成报告。
+
+```bash
+curl -s -X POST "http://127.0.0.1:8000/analyze/ai/report/save" \
+  -H "Content-Type: application/json" \
+  -d "{\"log_type\":\"docker_log\",\"log_text\":\"$(cat examples/docker_port_conflict.log)\"}" \
+  | python -m json.tool
+```
+
+如果多行日志通过 curl 传参不方便，可以先手动复制 `examples/` 中的日志内容进行测试。
 
 ## 测试通义千问连接
 
 ```bash
 curl -s http://127.0.0.1:8000/qwen/test | python -m json.tool
-```
-
-如果返回 `success=true`，说明通义千问连接正常。
-
-如果返回 `Qwen API request failed`，请重点检查：
-
-- `DASHSCOPE_API_KEY` 是否正确
-- `DASHSCOPE_BASE_URL` 是否为 `https://dashscope.aliyuncs.com/compatible-mode/v1`
-- `QWEN_MODEL` 是否为可用模型，例如 `qwen-plus`
-- 阿里云百炼是否已开通
-- API Key 是否属于百炼模型服务
-- 当前账号是否有额度
-- 当前服务器是否能访问 `dashscope.aliyuncs.com`
-
-## 测试 AI 分析接口
-
-```bash
-curl -s -X POST "http://127.0.0.1:8000/analyze/ai" \
-  -H "Content-Type: application/json" \
-  -d '{"log_type":"docker_log","log_text":"Error response from daemon: port is already allocated\ncontainer exited with code 1"}' \
-  | python -m json.tool
-```
-
-## 测试 AI Markdown 报告接口
-
-```bash
-curl -s -X POST "http://127.0.0.1:8000/analyze/ai/report" \
-  -H "Content-Type: application/json" \
-  -d '{"log_type":"docker_log","log_text":"Error response from daemon: port is already allocated\ncontainer exited with code 1"}' \
-  | python -m json.tool
 ```
 
 ## 为什么 JSON 里中文显示为 \uXXXX？

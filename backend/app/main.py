@@ -8,7 +8,11 @@ from app.schemas.request_schema import AnalyzeRequest
 from app.services.ai_analysis_service import analyze_log_with_ai
 from app.services.analyze_service import analyze_log
 from app.services.qwen_client import test_qwen_connection
-from app.services.report_service import generate_ai_markdown_report, generate_markdown_report
+from app.services.report_service import (
+    generate_ai_markdown_report,
+    generate_markdown_report,
+    save_report_to_file,
+)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 load_dotenv(PROJECT_ROOT / ".env", override=False)
@@ -59,6 +63,28 @@ def analyze_ai_report(request: AnalyzeRequest) -> dict:
         "ai_risk_level": ai_result.get("risk_level", "unknown"),
         "markdown_report": generate_ai_markdown_report(result),
     }
+
+
+@app.post("/analyze/ai/report/save")
+def analyze_ai_report_save(request: AnalyzeRequest) -> dict:
+    result = analyze_log_with_ai(request.log_type, request.log_text)
+    rule_result = result.get("rule_result") or {}
+    ai_result = result.get("ai_result") or {}
+    markdown_report = generate_ai_markdown_report(result)
+    report_path = save_report_to_file(markdown_report, result.get("log_type", request.log_type))
+
+    response = {
+        "log_type": result.get("log_type", request.log_type),
+        "rule_severity": rule_result.get("severity", "unknown"),
+        "ai_risk_level": ai_result.get("risk_level", "unknown"),
+        "report_path": report_path,
+        "markdown_report": markdown_report,
+    }
+
+    if report_path.startswith("failed to save report:"):
+        response["error"] = "failed to save report"
+
+    return response
 
 
 @app.get("/config/check")
