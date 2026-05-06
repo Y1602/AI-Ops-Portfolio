@@ -81,6 +81,7 @@ dry-run 模式不会请求 `/logs/ingest`，也不会生成报告。
 - `cd /opt/AI-Ops-Portfolio` 用于切换到项目目录
 - `/usr/bin/python3` 建议使用绝对路径
 - `--max-chars 20000` 可以避免 cron 周期执行时一次性发送过大的日志内容
+- `--max-chars` 默认值为 `20000`，可根据日志规模和分析需求调整
 - `--output-log logs/collect_recent_logs.log` 用于记录 `collect_recent_logs.py` 每次执行的结果，适合配合 cron 查看采集任务是否成功
 - 如果需要同时记录终端标准输出和错误输出，也可以继续使用 shell 重定向
 - 实际项目路径需要根据部署位置调整

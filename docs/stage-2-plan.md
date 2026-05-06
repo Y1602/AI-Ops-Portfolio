@@ -31,6 +31,7 @@
 - 支持空内容处理
 - 支持与现有规则分析、AI 分析、Markdown 报告生成链路衔接
 - 已补充 cron 定时采集说明文档：`docs/cron-guide.md`
+- 已新增第二阶段总结文档：`docs/stage-2-summary.md`
 
 ## 3. 当前能力边界
 

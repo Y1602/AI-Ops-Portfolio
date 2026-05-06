@@ -195,6 +195,8 @@ python scripts/collect_recent_logs.py \
 
 如果日志内容超过 `max_chars`，脚本会保留最后 `max_chars` 个字符，并在日志内容前添加 `[TRUNCATED]` 提示。
 
+保留末尾内容是因为日志排障通常更关注最近发生的错误，最新日志一般位于文件末尾。
+
 示例命令：
 
 ```bash
@@ -205,8 +207,9 @@ python scripts/collect_recent_logs.py \
   --env dev \
   --log-type nginx_error \
   --file examples/nginx_error_502.log \
-  --lines 200 \
-  --max-chars 5000
+  --lines 50 \
+  --max-chars 5000 \
+  --output-log logs/collect_recent_logs.log
 ```
 
 当前能力边界：

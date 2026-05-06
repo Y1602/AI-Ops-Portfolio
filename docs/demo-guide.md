@@ -188,6 +188,29 @@ python scripts/collect_recent_logs.py \
 
 如果内容超过 200 个字符，输出中会出现 `[TRUNCATED]` 提示。
 
+预期结果：
+
+```text
+[TRUNCATED] Log content exceeded max_chars=200, only the last 200 characters are kept.
+```
+
+正式发送示例：
+
+```bash
+python scripts/collect_recent_logs.py \
+  --server http://127.0.0.1:8000 \
+  --source nginx-web-01 \
+  --service-name nginx \
+  --env dev \
+  --log-type nginx_error \
+  --file examples/nginx_error_502.log \
+  --lines 50 \
+  --max-chars 5000 \
+  --output-log logs/collect_recent_logs.log
+```
+
+执行成功后，后端仍会生成 Markdown 故障分析报告，`output-log` 中会记录 `max_chars` 和 `truncated` 状态。
+
 ## 4. 查看接口返回结果
 
 示例返回结构：
