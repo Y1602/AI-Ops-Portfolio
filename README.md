@@ -1,6 +1,6 @@
 # AI-OpsLog
 
-AI-OpsLog 是一个运维日志分析助手 Demo 项目。当前版本实现 FastAPI 后端服务：用户提交日志类型和日志文本，后端先进行规则解析，再可选生成 Markdown 报告，或调用阿里云百炼 / 通义千问 DashScope OpenAI 兼容接口输出结构化故障分析 JSON。
+AI-OpsLog 是一个运维日志分析助手 Demo 项目。当前版本实现 FastAPI 后端服务：用户提交日志类型和日志文本，后端先进行规则解析，再可选生成 Markdown 报告，或调用阿里云百炼 / 通义千问 DashScope OpenAI 兼容接口输出结构化故障分析 JSON，并生成 AI Markdown 故障分析报告。
 
 当前 Demo 不包含前端、数据库、Docker 化，也不会自动执行任何系统命令。
 
@@ -37,14 +37,6 @@ export DASHSCOPE_BASE_URL="https://dashscope.aliyuncs.com/compatible-mode/v1"
 export QWEN_MODEL="qwen-plus"
 ```
 
-PowerShell：
-
-```powershell
-$env:DASHSCOPE_API_KEY="your_dashscope_api_key_here"
-$env:DASHSCOPE_BASE_URL="https://dashscope.aliyuncs.com/compatible-mode/v1"
-$env:QWEN_MODEL="qwen-plus"
-```
-
 方式二：使用 `.env` 文件
 
 ```bash
@@ -78,23 +70,14 @@ http://127.0.0.1:8000
 - `GET /health`: 健康检查
 - `GET /config/check`: 检查 DashScope 配置是否已加载，不会返回 API Key 原文
 - `POST /analyze`: 规则解析接口
-- `POST /analyze/report`: 规则报告接口，返回 Markdown 报告
+- `POST /analyze/report`: 规则解析 Markdown 报告接口
 - `POST /analyze/ai`: 通义千问辅助分析接口，返回结构化故障分析 JSON
+- `POST /analyze/ai/report`: AI Markdown 报告接口，基于规则解析和通义千问分析结果生成 Markdown 故障分析报告
 
 ## 检查配置是否生效
 
 ```bash
 curl -s http://127.0.0.1:8000/config/check | python -m json.tool
-```
-
-返回示例：
-
-```json
-{
-  "dashscope_api_key_configured": true,
-  "dashscope_base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
-  "qwen_model": "qwen-plus"
-}
 ```
 
 ## curl 测试示例
@@ -110,7 +93,7 @@ curl -s -X POST "http://127.0.0.1:8000/analyze" \
   | python -m json.tool
 ```
 
-Markdown 报告接口：
+规则 Markdown 报告接口：
 
 ```bash
 curl -s -X POST "http://127.0.0.1:8000/analyze/report" \
@@ -119,7 +102,7 @@ curl -s -X POST "http://127.0.0.1:8000/analyze/report" \
   | python -m json.tool
 ```
 
-测试 AI 分析接口：
+通义千问 AI 分析接口：
 
 ```bash
 curl -s -X POST "http://127.0.0.1:8000/analyze/ai" \
@@ -127,6 +110,22 @@ curl -s -X POST "http://127.0.0.1:8000/analyze/ai" \
   -d '{"log_type":"docker_log","log_text":"Error response from daemon: port is already allocated\ncontainer exited with code 1"}' \
   | python -m json.tool
 ```
+
+AI Markdown 报告接口：
+
+```bash
+curl -s -X POST "http://127.0.0.1:8000/analyze/ai/report" \
+  -H "Content-Type: application/json" \
+  -d '{"log_type":"docker_log","log_text":"Error response from daemon: port is already allocated\ncontainer exited with code 1"}' \
+  | python -m json.tool
+```
+
+说明：
+
+- `markdown_report` 字段中是完整 Markdown 报告。
+- 可以复制 `markdown_report` 内容保存为 `.md` 文件。
+- AI 建议命令只用于人工排查参考。
+- 本系统不会自动执行命令。
 
 ## 安全说明
 

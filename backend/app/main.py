@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 from app.schemas.request_schema import AnalyzeRequest
 from app.services.ai_analysis_service import analyze_log_with_ai
 from app.services.analyze_service import analyze_log
-from app.services.report_service import generate_markdown_report
+from app.services.report_service import generate_ai_markdown_report, generate_markdown_report
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 load_dotenv(PROJECT_ROOT / ".env", override=False)
@@ -44,6 +44,20 @@ def analyze_report(request: AnalyzeRequest) -> dict:
 @app.post("/analyze/ai")
 def analyze_ai(request: AnalyzeRequest) -> dict:
     return analyze_log_with_ai(request.log_type, request.log_text)
+
+
+@app.post("/analyze/ai/report")
+def analyze_ai_report(request: AnalyzeRequest) -> dict:
+    result = analyze_log_with_ai(request.log_type, request.log_text)
+    rule_result = result.get("rule_result") or {}
+    ai_result = result.get("ai_result") or {}
+
+    return {
+        "log_type": result.get("log_type", request.log_type),
+        "rule_severity": rule_result.get("severity", "unknown"),
+        "ai_risk_level": ai_result.get("risk_level", "unknown"),
+        "markdown_report": generate_ai_markdown_report(result),
+    }
 
 
 @app.get("/config/check")
