@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 from app.schemas.request_schema import AnalyzeRequest
 from app.services.ai_analysis_service import analyze_log_with_ai
 from app.services.analyze_service import analyze_log
+from app.services.qwen_client import test_qwen_connection
 from app.services.report_service import generate_ai_markdown_report, generate_markdown_report
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -70,3 +71,8 @@ def config_check() -> dict:
         ),
         "qwen_model": os.getenv("QWEN_MODEL", "qwen-plus"),
     }
+
+
+@app.get("/qwen/test")
+def qwen_test() -> dict:
+    return test_qwen_connection()
