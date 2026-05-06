@@ -1,27 +1,45 @@
 # AI-OpsLog 项目设计
 
-## 项目背景
+## 1. 项目定位
 
-AI-OpsLog 是一个轻量级运维日志分析 Demo，用于接收外部服务日志，进行规则解析，调用通义千问辅助分析，并生成 Markdown 故障分析报告。
+AI-OpsLog 当前是一个日志接收与分析 Demo，面向运维/SRE 学习与项目展示场景。它不直接采集生产日志，不自动执行命令，也不替代人工决策。
 
-## 当前能力
+项目主要用于辅助初级运维理解报错日志、生成排障报告、沉淀故障案例。
 
-- FastAPI 后端服务。
-- `/logs/ingest` 外部日志接收接口。
-- Nginx access、Nginx error、Docker log 三类规则解析器。
-- 通义千问 AI 辅助分析。
-- Markdown 报告生成与保存。
-- `reports/` 目录沉淀典型故障报告。
-- Docker Compose 部署。
-- `scripts/send_log.py` 模拟外部服务发送日志。
+## 2. 当前架构
 
-## 报告持久化设计
+```text
+External Service Logs
+    ↓
+scripts/send_log.py / HTTP POST
+    ↓
+POST /logs/ingest
+    ↓
+Rule Parser
+    ↓
+Qwen AI Analysis
+    ↓
+Markdown Report
+    ↓
+reports/
+```
 
-AI-OpsLog 在 Docker Compose 模式下通过 volume 将宿主机 `reports/` 目录挂载到容器 `/app/reports`。
+## 3. 核心模块
 
-服务内部通过 `REPORTS_DIR` 环境变量指定报告输出目录，避免因相对路径导致报告保存位置不一致。
+- `backend/app/main.py`: FastAPI 路由入口
+- `backend/app/parsers/`: Nginx / Docker 规则解析器
+- `backend/app/services/ai_analysis_service.py`: 规则解析与 AI 分析编排
+- `backend/app/services/qwen_client.py`: 通义千问 OpenAI 兼容接口调用
+- `backend/app/services/report_service.py`: Markdown 报告生成与保存
+- `backend/app/services/ingest_service.py`: 外部日志接收流程
+- `scripts/send_log.py`: 模拟外部服务器发送日志
+- `reports/`: 运行时报告输出目录
 
-Docker Compose 推荐配置：
+## 4. 报告持久化设计
+
+Docker Compose 模式下，宿主机 `reports/` 目录挂载到容器 `/app/reports`。
+
+服务通过 `REPORTS_DIR` 指定报告输出目录，避免相对路径导致容器内外保存位置不一致。
 
 ```text
 REPORTS_DIR=/app/reports
@@ -32,24 +50,21 @@ REPORTS_DIR=/app/reports
 
 `GET /reports/check` 用于检查当前报告目录是否存在、是否可写，以及当前 `.md` 报告数量。该接口不会读取报告正文，也不会返回任何 API Key。
 
-## Docker 化部署
+## 5. 能力边界
 
-部署后服务监听 `8000` 端口，对外提供日志接收与分析接口。
+- 不自动执行任何系统命令。
+- 不替代人工排障和生产操作决策。
+- 不直接采集生产日志。
+- 不保存历史记录到数据库。
+- 不提供权限控制、多租户或审计能力。
+- AI 输出的命令只作为人工排查参考。
 
-环境变量通过 `.env` 文件传入，避免将 `DASHSCOPE_API_KEY` 写入代码或镜像。
+## 6. 后续方向
 
-## 暂不支持内容
-
-- 不支持前端页面。
-- 不支持数据库存储。
-- 不支持自动修复。
-- 不支持自动执行命令。
-- 不支持生产环境日志采集 Agent。
-
-## 后续计划
-
-- 增加更多日志类型。
-- 支持日志文件上传。
-- 增加定时提交日志能力。
-- 支持 `tail -f` 增量日志采集。
-- 接入 Prometheus Alertmanager Webhook。
+- 增加 Redis / Linux 系统日志解析
+- 增加定时日志采集
+- 增加 `tail -f` 增量采集
+- 接入 Prometheus Alertmanager Webhook
+- 增加简单 Web 页面
+- 增加历史记录数据库
+- 增加更多故障案例样例
