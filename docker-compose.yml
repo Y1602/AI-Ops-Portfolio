@@ -1,7 +1,6 @@
 services:
   ai-opslog-backend:
-    build:
-      context: ./backend
+    image: ai-opslog-backend:latest 
     container_name: ai-opslog-backend
     ports:
       - "8000:8000"
