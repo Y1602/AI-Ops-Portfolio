@@ -1,0 +1,152 @@
+
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI-OpsLog 历史记录详情</title>
+  
+  <style>
+    body {
+      margin: 0;
+      background: #f6f8fa;
+      color: #1f2937;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+      line-height: 1.5;
+    }
+    .page {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 32px 20px 40px;
+    }
+    header {
+      margin-bottom: 24px;
+    }
+    h1 {
+      margin: 0 0 8px;
+      font-size: 30px;
+      font-weight: 700;
+    }
+    h2 {
+      margin: 0 0 12px;
+      font-size: 20px;
+    }
+    section {
+      margin-top: 24px;
+    }
+    .subtitle {
+      margin: 0;
+      color: #4b5563;
+      font-size: 15px;
+    }
+    .detail-grid {
+      display: grid;
+      grid-template-columns: 180px minmax(0, 1fr);
+      margin: 0;
+      background: #ffffff;
+      border: 1px solid #d8dee4;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    dt, dd {
+      margin: 0;
+      padding: 11px 14px;
+      border-bottom: 1px solid #e5e7eb;
+      font-size: 14px;
+    }
+    dt {
+      background: #f3f4f6;
+      color: #374151;
+      font-weight: 600;
+    }
+    dd {
+      overflow-wrap: anywhere;
+    }
+    dt:nth-last-of-type(1), dd:nth-last-of-type(1) {
+      border-bottom: 0;
+    }
+    .notice {
+      padding: 16px;
+      background: #ffffff;
+      border: 1px solid #d8dee4;
+      border-radius: 8px;
+      color: #4b5563;
+    }
+    .error {
+      border-color: #f1b7b7;
+      background: #fff5f5;
+      color: #991b1b;
+    }
+    .links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 8px;
+    }
+    .links a {
+      display: inline-block;
+      padding: 6px 10px;
+      border: 1px solid #d8dee4;
+      border-radius: 6px;
+      background: #ffffff;
+      color: #1f2937;
+      text-decoration: none;
+      font-size: 13px;
+      font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+    }
+  </style>
+
+</head>
+<body>
+  <main class="page">
+    <header>
+      <h1>AI-OpsLog 历史记录详情</h1>
+      <p class="subtitle">查看 SQLite 中保存的单条分析元数据</p>
+    </header>
+
+    <section>
+      <h2>基本信息</h2>
+      <dl class="detail-grid">
+        <dt>ID</dt><dd>2</dd>
+        <dt>创建时间</dt><dd>2026-05-07 05:48:43</dd>
+        <dt>来源</dt><dd>nginx-web-01</dd>
+        <dt>服务名</dt><dd>CPU 使用率过高（HighCPUUsage）</dd>
+        <dt>环境</dt><dd>monitoring</dd>
+        <dt>类型</dt><dd>Alertmanager 告警（alertmanager_alert）</dd>
+      </dl>
+    </section>
+
+    <section>
+      <h2>风险信息</h2>
+      <dl class="detail-grid">
+        <dt>规则风险等级</dt><dd>中（medium）</dd>
+        <dt>AI 风险等级</dt><dd>中（medium）</dd>
+      </dl>
+    </section>
+
+    <section>
+      <h2>报告信息</h2>
+      <dl class="detail-grid">
+        <dt>报告路径 (report_path)</dt><dd>app/reports/ai_opslog_alertmanager_alert_nginx-web-01_HighCPUUsage_report.md</dd>
+        <dt>接口消息</dt><dd>-</dd>
+      </dl>
+    </section>
+
+    <section>
+      <h2>告警信息</h2>
+      <dl class="detail-grid">
+        <dt>告警数量</dt><dd>-</dd>
+        <dt>告警状态</dt><dd>触发中（firing）</dd>
+      </dl>
+    </section>
+
+    <section>
+      <h2>相关入口</h2>
+      <div class="links">
+        <a href="/">返回首页</a>
+        <a href="/history/2">查看 JSON API：/history/2</a>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

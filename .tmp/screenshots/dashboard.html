@@ -1,0 +1,175 @@
+
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI-OpsLog 运维日志分析助手</title>
+  <style>
+    body {
+      margin: 0;
+      background: #f6f8fa;
+      color: #1f2937;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+      line-height: 1.5;
+    }
+    .page {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 32px 20px 40px;
+    }
+    header {
+      margin-bottom: 24px;
+    }
+    h1 {
+      margin: 0 0 8px;
+      font-size: 30px;
+      font-weight: 700;
+    }
+    .subtitle {
+      margin: 0;
+      color: #4b5563;
+      font-size: 15px;
+    }
+    section {
+      margin-top: 24px;
+    }
+    h2 {
+      margin: 0 0 12px;
+      font-size: 20px;
+    }
+    .table-wrap {
+      overflow-x: auto;
+      background: #ffffff;
+      border: 1px solid #d8dee4;
+      border-radius: 8px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+      min-width: 1180px;
+    }
+    th, td {
+      padding: 10px 12px;
+      border-bottom: 1px solid #e5e7eb;
+      text-align: left;
+      vertical-align: top;
+      font-size: 14px;
+      word-break: break-word;
+      overflow-wrap: anywhere;
+    }
+    th {
+      background: #f3f4f6;
+      color: #374151;
+      font-weight: 600;
+    }
+    tr:last-child td {
+      border-bottom: 0;
+    }
+    .col-id {
+      width: 52px;
+    }
+    .col-time {
+      width: 150px;
+    }
+    .col-env {
+      width: 78px;
+    }
+    .col-risk {
+      width: 88px;
+    }
+    .col-status {
+      width: 90px;
+    }
+    .col-report {
+      width: 78px;
+    }
+    .col-action {
+      width: 92px;
+    }
+    .badge {
+      display: inline-block;
+      min-width: 28px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+      text-align: center;
+      border: 1px solid #d8dee4;
+      background: #f3f4f6;
+      color: #374151;
+    }
+    .badge-critical, .badge-high {
+      border-color: #f1b7b7;
+      background: #fff5f5;
+      color: #991b1b;
+    }
+    .badge-medium {
+      border-color: #f2d28a;
+      background: #fffbeb;
+      color: #92400e;
+    }
+    .badge-low {
+      border-color: #bbd7c0;
+      background: #f0fdf4;
+      color: #166534;
+    }
+    .empty, .notice {
+      padding: 16px;
+      background: #ffffff;
+      border: 1px solid #d8dee4;
+      border-radius: 8px;
+      color: #4b5563;
+    }
+    .error {
+      border-color: #f1b7b7;
+      background: #fff5f5;
+      color: #991b1b;
+      margin-bottom: 16px;
+    }
+    .links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 8px;
+    }
+    .links a, .endpoint {
+      display: inline-block;
+      padding: 6px 10px;
+      border: 1px solid #d8dee4;
+      border-radius: 6px;
+      background: #ffffff;
+      color: #1f2937;
+      text-decoration: none;
+      font-size: 13px;
+      font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header>
+      <h1>AI-OpsLog 运维日志分析助手</h1>
+      <p class="subtitle">基于规则分析与通义千问的运维日志 / 告警辅助分析 Demo</p>
+    </header>
+
+    <section>
+      <h2>最近分析记录</h2>
+      
+      <div class="table-wrap"><table><thead><tr><th class="col-id">ID</th><th class="col-time">时间</th><th>来源</th><th>服务</th><th class="col-env">环境</th><th>类型</th><th class="col-risk">规则风险</th><th class="col-risk">AI 风险</th><th class="col-status">告警状态</th><th class="col-report">报告</th><th class="col-action">操作</th></tr></thead><tbody><tr><td>2</td><td>2026-05-07 05:48:43</td><td>nginx-web-01</td><td>CPU 使用率过高</td><td>monitoring</td><td>Alertmanager 告警</td><td><span class="badge badge-medium">中</span></td><td><span class="badge badge-medium">中</span></td><td>触发中</td><td>已生成</td><td><a href="/records/2">查看详情</a></td></tr><tr><td>1</td><td>2026-05-07 05:42:10</td><td>docker-host-01</td><td>redis-container</td><td>dev</td><td>Docker 日志</td><td><span class="badge badge-high">高</span></td><td><span class="badge badge-high">高</span></td><td>-</td><td>已生成</td><td><a href="/records/1">查看详情</a></td></tr></tbody></table></div>
+    </section>
+
+    <section>
+      <h2>API Endpoints</h2>
+      <div class="links">
+        <a href="/history/recent">GET /history/recent</a>
+        <span class="endpoint">GET /history/{id}</span>
+        <span class="endpoint">POST /logs/ingest</span>
+        <span class="endpoint">POST /alerts/alertmanager</span>
+        <a href="/health">GET /health</a>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
