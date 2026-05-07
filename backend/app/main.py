@@ -1,8 +1,9 @@
 import os
+from html import escape
 from pathlib import Path
 
 from fastapi import FastAPI, Header, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from dotenv import load_dotenv
 
 from app.schemas.request_schema import AnalyzeRequest, IngestLogRequest
@@ -39,6 +40,207 @@ def startup_init_db() -> None:
     except Exception as exc:
         print(f"failed to initialize AI-OpsLog SQLite database: {exc}")
         raise
+
+
+@app.get("/", response_class=HTMLResponse)
+def dashboard() -> HTMLResponse:
+    error_message = ""
+    try:
+        records = get_recent_analysis_records(limit=10)
+    except Exception as exc:
+        records = []
+        error_message = f"历史记录查询失败：{exc}"
+
+    table_body = _render_dashboard_rows(records)
+    error_block = ""
+    if error_message:
+        error_block = f'<div class="notice error">{escape(error_message)}</div>'
+
+    html = f"""
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI-OpsLog 运维日志分析助手</title>
+  <style>
+    body {{
+      margin: 0;
+      background: #f6f8fa;
+      color: #1f2937;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+      line-height: 1.5;
+    }}
+    .page {{
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 32px 20px 40px;
+    }}
+    header {{
+      margin-bottom: 24px;
+    }}
+    h1 {{
+      margin: 0 0 8px;
+      font-size: 30px;
+      font-weight: 700;
+    }}
+    .subtitle {{
+      margin: 0;
+      color: #4b5563;
+      font-size: 15px;
+    }}
+    section {{
+      margin-top: 24px;
+    }}
+    h2 {{
+      margin: 0 0 12px;
+      font-size: 20px;
+    }}
+    .table-wrap {{
+      overflow-x: auto;
+      background: #ffffff;
+      border: 1px solid #d8dee4;
+      border-radius: 8px;
+    }}
+    table {{
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 1040px;
+    }}
+    th, td {{
+      padding: 10px 12px;
+      border-bottom: 1px solid #e5e7eb;
+      text-align: left;
+      vertical-align: top;
+      font-size: 13px;
+      white-space: nowrap;
+    }}
+    th {{
+      background: #f3f4f6;
+      color: #374151;
+      font-weight: 600;
+    }}
+    tr:last-child td {{
+      border-bottom: 0;
+    }}
+    .path {{
+      white-space: normal;
+      max-width: 280px;
+      overflow-wrap: anywhere;
+      color: #374151;
+    }}
+    .empty, .notice {{
+      padding: 16px;
+      background: #ffffff;
+      border: 1px solid #d8dee4;
+      border-radius: 8px;
+      color: #4b5563;
+    }}
+    .error {{
+      border-color: #f1b7b7;
+      background: #fff5f5;
+      color: #991b1b;
+      margin-bottom: 16px;
+    }}
+    .links {{
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 8px;
+    }}
+    .links a, .endpoint {{
+      display: inline-block;
+      padding: 6px 10px;
+      border: 1px solid #d8dee4;
+      border-radius: 6px;
+      background: #ffffff;
+      color: #1f2937;
+      text-decoration: none;
+      font-size: 13px;
+      font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+    }}
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header>
+      <h1>AI-OpsLog 运维日志分析助手</h1>
+      <p class="subtitle">基于规则分析与通义千问的运维日志 / 告警辅助分析 Demo</p>
+    </header>
+
+    <section>
+      <h2>最近分析记录</h2>
+      {error_block}
+      {table_body}
+    </section>
+
+    <section>
+      <h2>API Endpoints</h2>
+      <div class="links">
+        <a href="/history/recent">GET /history/recent</a>
+        <span class="endpoint">GET /history/{{id}}</span>
+        <span class="endpoint">POST /logs/ingest</span>
+        <span class="endpoint">POST /alerts/alertmanager</span>
+        <a href="/health">GET /health</a>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
+"""
+    return HTMLResponse(content=html)
+
+
+def _render_dashboard_rows(records: list[dict]) -> str:
+    if not records:
+        return '<div class="empty">暂无历史记录</div>'
+
+    rows = []
+    for record in records:
+        rows.append(
+            "<tr>"
+            f"<td>{_dashboard_value(record.get('id'))}</td>"
+            f"<td>{_dashboard_value(record.get('created_at'))}</td>"
+            f"<td>{_dashboard_value(record.get('source'))}</td>"
+            f"<td>{_dashboard_value(record.get('service_name'))}</td>"
+            f"<td>{_dashboard_value(record.get('env'))}</td>"
+            f"<td>{_dashboard_value(record.get('log_type'))}</td>"
+            f"<td>{_dashboard_value(record.get('rule_severity'))}</td>"
+            f"<td>{_dashboard_value(record.get('ai_risk_level'))}</td>"
+            f"<td>{_dashboard_value(record.get('alert_count'))}</td>"
+            f"<td>{_dashboard_value(record.get('webhook_status'))}</td>"
+            f'<td class="path">{_dashboard_value(record.get("report_path"))}</td>'
+            "</tr>"
+        )
+
+    return (
+        '<div class="table-wrap">'
+        "<table>"
+        "<thead>"
+        "<tr>"
+        "<th>ID</th>"
+        "<th>时间</th>"
+        "<th>来源</th>"
+        "<th>服务</th>"
+        "<th>环境</th>"
+        "<th>类型</th>"
+        "<th>规则风险</th>"
+        "<th>AI 风险</th>"
+        "<th>告警数量</th>"
+        "<th>告警状态</th>"
+        "<th>报告路径</th>"
+        "</tr>"
+        "</thead>"
+        f"<tbody>{''.join(rows)}</tbody>"
+        "</table>"
+        "</div>"
+    )
+
+
+def _dashboard_value(value: object) -> str:
+    if value is None:
+        return ""
+    return escape(str(value))
 
 
 @app.get("/health")
