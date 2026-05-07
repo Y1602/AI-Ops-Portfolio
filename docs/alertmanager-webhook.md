@@ -176,7 +176,15 @@ Token 校验只保护 `POST /alerts/alertmanager`，不影响 `/logs/ingest`、`
 
 该 Token 校验只是 Demo 项目的基础保护示例，不等于完整认证授权系统。
 
-## 10. 告警报告结构
+## 10. Alertmanager 配置示例
+
+真实 Alertmanager 的 webhook receiver 配置示例请参考：`docs/alertmanager-config-example.md`。
+
+示例配置文件位于：`examples/alertmanager.yml`。
+
+当前项目不负责部署 Prometheus / Alertmanager / Grafana，也不负责配置真实告警规则；这里只提供 Webhook 接收接口和配置参考。
+
+## 11. 告警报告结构
 
 Alertmanager 告警报告主要包含：
 
@@ -189,7 +197,7 @@ Alertmanager 告警报告主要包含：
 
 AI 输出的命令或步骤仅作为人工排查参考，AI-OpsLog 不会自动执行任何系统命令。
 
-## 11. 后续方向
+## 12. 后续方向
 
 - 接入真实 Alertmanager
 - 增加更多告警类型规则

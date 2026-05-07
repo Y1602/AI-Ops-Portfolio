@@ -251,7 +251,7 @@ curl -X POST http://127.0.0.1:8000/alerts/alertmanager \
   -d @examples/alertmanager_webhook_high_cpu.json
 ```
 
-详细说明见：[docs/alertmanager-webhook.md](docs/alertmanager-webhook.md) 和 [docs/stage-3-plan.md](docs/stage-3-plan.md)。
+详细说明见：[docs/alertmanager-webhook.md](docs/alertmanager-webhook.md)、[docs/alertmanager-config-example.md](docs/alertmanager-config-example.md)、[docs/stage-3-plan.md](docs/stage-3-plan.md) 和 [docs/stage-3-summary.md](docs/stage-3-summary.md)。
 
 ## 6. API 接口说明
 

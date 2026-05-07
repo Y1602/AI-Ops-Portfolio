@@ -22,6 +22,10 @@
 - 支持可选 Alertmanager Webhook Token 校验
 - 通过 `ALERTMANAGER_WEBHOOK_TOKEN` 环境变量启用
 - 请求 Header 使用 `X-Alertmanager-Token`
+- 新增 Alertmanager 配置示例文档
+- 新增 `examples/alertmanager.yml`
+- 提供 `send_resolved: true` 示例
+- 提供 Token 场景下通过反向代理添加 Header 的说明
 - 不影响原有 `/logs/ingest` 日志分析接口
 
 ## 3. 当前链路
@@ -69,9 +73,17 @@ reports/
 - 不包含签名验签
 - Token 校验只保护 `POST /alerts/alertmanager`
 - 不影响 `/logs/ingest`
+- 当前不部署真实 Alertmanager
+- 当前 `examples/alertmanager.yml` 仅作为配置参考
+- 当前不保证适配所有 Alertmanager 版本的高级认证配置
 
 ## 5. 下一步计划
 
 - 增加更多 Alertmanager 示例
-- 增加真实 Alertmanager 配置示例
 - 后续接入历史记录存储
+
+## 6. 阶段总结
+
+第三阶段总结文档见：`docs/stage-3-summary.md`。
+
+第三阶段完成 Alertmanager Webhook 接入闭环后，后续建议进入历史记录存储阶段。

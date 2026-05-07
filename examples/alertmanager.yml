@@ -1,0 +1,15 @@
+# Minimal Alertmanager webhook receiver example for AI-OpsLog.
+# Replace 127.0.0.1:8000 with the actual AI-OpsLog service address.
+# If ALERTMANAGER_WEBHOOK_TOKEN is enabled, make sure the request carries X-Alertmanager-Token.
+
+global:
+  resolve_timeout: 5m
+
+route:
+  receiver: ai-opslog-webhook
+
+receivers:
+  - name: ai-opslog-webhook
+    webhook_configs:
+      - url: "http://127.0.0.1:8000/alerts/alertmanager"
+        send_resolved: true
