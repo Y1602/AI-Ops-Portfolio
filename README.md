@@ -303,7 +303,7 @@ curl "http://127.0.0.1:8000/history/recent?log_type=alertmanager_alert&webhook_s
 - `GET /history/recent`：查询最近历史记录
 - `GET /history/{id}`：查询单条历史记录
 
-详情页只展示 SQLite 中保存的分析元数据，不读取 Markdown 报告正文。当前展示页面只用于 Demo 和项目展示，不是完整前端系统。阶段计划见：[docs/stage-5-plan.md](docs/stage-5-plan.md)。
+详情页只展示 SQLite 中保存的分析元数据，不读取 Markdown 报告正文。Web 展示页已做基础可读性优化：时间格式更易读，首页不直接展示长报告路径，日志类型、风险等级和告警状态使用中文展示，详情页保留完整元数据。当前展示页面只用于 Demo 和项目展示，不是完整前端系统。阶段计划见：[docs/stage-5-plan.md](docs/stage-5-plan.md)。
 
 ## 6. API 接口说明
 

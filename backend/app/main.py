@@ -1,4 +1,5 @@
 import os
+from datetime import datetime
 from html import escape
 from pathlib import Path
 
@@ -72,7 +73,7 @@ def dashboard() -> HTMLResponse:
       line-height: 1.5;
     }}
     .page {{
-      max-width: 1180px;
+      max-width: 1400px;
       margin: 0 auto;
       padding: 32px 20px 40px;
     }}
@@ -105,15 +106,17 @@ def dashboard() -> HTMLResponse:
     table {{
       width: 100%;
       border-collapse: collapse;
-      min-width: 1120px;
+      table-layout: fixed;
+      min-width: 1180px;
     }}
     th, td {{
       padding: 10px 12px;
       border-bottom: 1px solid #e5e7eb;
       text-align: left;
       vertical-align: top;
-      font-size: 13px;
-      white-space: nowrap;
+      font-size: 14px;
+      word-break: break-word;
+      overflow-wrap: anywhere;
     }}
     th {{
       background: #f3f4f6;
@@ -123,11 +126,53 @@ def dashboard() -> HTMLResponse:
     tr:last-child td {{
       border-bottom: 0;
     }}
-    .path {{
-      white-space: normal;
-      max-width: 280px;
-      overflow-wrap: anywhere;
+    .col-id {{
+      width: 52px;
+    }}
+    .col-time {{
+      width: 150px;
+    }}
+    .col-env {{
+      width: 78px;
+    }}
+    .col-risk {{
+      width: 88px;
+    }}
+    .col-status {{
+      width: 90px;
+    }}
+    .col-report {{
+      width: 78px;
+    }}
+    .col-action {{
+      width: 92px;
+    }}
+    .badge {{
+      display: inline-block;
+      min-width: 28px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+      text-align: center;
+      border: 1px solid #d8dee4;
+      background: #f3f4f6;
       color: #374151;
+    }}
+    .badge-critical, .badge-high {{
+      border-color: #f1b7b7;
+      background: #fff5f5;
+      color: #991b1b;
+    }}
+    .badge-medium {{
+      border-color: #f2d28a;
+      background: #fffbeb;
+      color: #92400e;
+    }}
+    .badge-low {{
+      border-color: #bbd7c0;
+      background: #f0fdf4;
+      color: #166534;
     }}
     .empty, .notice {{
       padding: 16px;
@@ -200,16 +245,15 @@ def _render_dashboard_rows(records: list[dict]) -> str:
         rows.append(
             "<tr>"
             f"<td>{_dashboard_value(record.get('id'))}</td>"
-            f"<td>{_dashboard_value(record.get('created_at'))}</td>"
+            f"<td>{_dashboard_value(format_datetime_for_display(record.get('created_at')))}</td>"
             f"<td>{_dashboard_value(record.get('source'))}</td>"
-            f"<td>{_dashboard_value(record.get('service_name'))}</td>"
+            f"<td>{_dashboard_value(display_service_name(record.get('service_name')))}</td>"
             f"<td>{_dashboard_value(record.get('env'))}</td>"
-            f"<td>{_dashboard_value(record.get('log_type'))}</td>"
-            f"<td>{_dashboard_value(record.get('rule_severity'))}</td>"
-            f"<td>{_dashboard_value(record.get('ai_risk_level'))}</td>"
-            f"<td>{_dashboard_value(record.get('alert_count'))}</td>"
-            f"<td>{_dashboard_value(record.get('webhook_status'))}</td>"
-            f'<td class="path">{_dashboard_value(record.get("report_path"))}</td>'
+            f"<td>{_dashboard_value(display_log_type(record.get('log_type')))}</td>"
+            f"<td>{_risk_badge(record.get('rule_severity'))}</td>"
+            f"<td>{_risk_badge(record.get('ai_risk_level'))}</td>"
+            f"<td>{_dashboard_value(display_webhook_status(record.get('webhook_status')))}</td>"
+            f"<td>{_dashboard_value(display_report_status(record.get('report_path')))}</td>"
             f'<td><a href="/records/{_dashboard_value(record.get("id"))}">查看详情</a></td>'
             "</tr>"
         )
@@ -219,18 +263,17 @@ def _render_dashboard_rows(records: list[dict]) -> str:
         "<table>"
         "<thead>"
         "<tr>"
-        "<th>ID</th>"
-        "<th>时间</th>"
+        '<th class="col-id">ID</th>'
+        '<th class="col-time">时间</th>'
         "<th>来源</th>"
         "<th>服务</th>"
-        "<th>环境</th>"
+        '<th class="col-env">环境</th>'
         "<th>类型</th>"
-        "<th>规则风险</th>"
-        "<th>AI 风险</th>"
-        "<th>告警数量</th>"
-        "<th>告警状态</th>"
-        "<th>报告路径</th>"
-        "<th>操作</th>"
+        '<th class="col-risk">规则风险</th>'
+        '<th class="col-risk">AI 风险</th>'
+        '<th class="col-status">告警状态</th>'
+        '<th class="col-report">报告</th>'
+        '<th class="col-action">操作</th>'
         "</tr>"
         "</thead>"
         f"<tbody>{''.join(rows)}</tbody>"
@@ -243,6 +286,80 @@ def _dashboard_value(value: object) -> str:
     if value is None:
         return ""
     return escape(str(value))
+
+
+def format_datetime_for_display(value: object) -> str:
+    if value is None or value == "":
+        return "-"
+
+    raw_value = str(value)
+    try:
+        parsed = datetime.fromisoformat(raw_value.replace("Z", "+00:00"))
+    except ValueError:
+        return raw_value
+
+    return parsed.strftime("%Y-%m-%d %H:%M:%S")
+
+
+def display_log_type(value: object) -> str:
+    mapping = {
+        "docker_log": "Docker 日志",
+        "nginx_error": "Nginx 错误日志",
+        "nginx_access": "Nginx 访问日志",
+        "alertmanager_alert": "Alertmanager 告警",
+    }
+    return _mapped_display_value(value, mapping)
+
+
+def display_risk_level(value: object) -> str:
+    mapping = {
+        "critical": "严重",
+        "high": "高",
+        "medium": "中",
+        "low": "低",
+        "unknown": "未知",
+    }
+    return _mapped_display_value(value, mapping)
+
+
+def display_webhook_status(value: object) -> str:
+    mapping = {
+        "firing": "触发中",
+        "resolved": "已恢复",
+        "mixed": "混合状态",
+    }
+    return _mapped_display_value(value, mapping)
+
+
+def display_service_name(value: object) -> str:
+    mapping = {
+        "HighCPUUsage": "CPU 使用率过高",
+        "RedisDown": "Redis 服务异常",
+        "NginxDown": "Nginx 服务异常",
+        "DiskSpaceLow": "磁盘空间不足",
+    }
+    return _mapped_display_value(value, mapping)
+
+
+def display_report_status(value: object) -> str:
+    if value is None or value == "":
+        return "-"
+    return "已生成"
+
+
+def _mapped_display_value(value: object, mapping: dict[str, str]) -> str:
+    if value is None or value == "":
+        return "-"
+    raw_value = str(value)
+    return mapping.get(raw_value, raw_value)
+
+
+def _risk_badge(value: object) -> str:
+    raw_value = "" if value is None else str(value)
+    display_value = display_risk_level(raw_value)
+    css_key = raw_value.lower() if raw_value else "unknown"
+    css_class = f"badge badge-{escape(css_key)}"
+    return f'<span class="{css_class}">{escape(display_value)}</span>'
 
 
 @app.get("/records/{record_id}", response_class=HTMLResponse)
@@ -289,26 +406,26 @@ def record_detail_page(record_id: int) -> HTMLResponse:
       <h2>基本信息</h2>
       <dl class="detail-grid">
         {_record_field("ID", record.get("id"))}
-        {_record_field("创建时间", record.get("created_at"))}
+        {_record_field("创建时间", format_datetime_for_display(record.get("created_at")))}
         {_record_field("来源", record.get("source"))}
-        {_record_field("服务名", record.get("service_name"))}
+        {_record_display_field("服务名", record.get("service_name"), display_service_name)}
         {_record_field("环境", record.get("env"))}
-        {_record_field("类型", record.get("log_type"))}
+        {_record_display_field("类型", record.get("log_type"), display_log_type)}
       </dl>
     </section>
 
     <section>
       <h2>风险信息</h2>
       <dl class="detail-grid">
-        {_record_field("规则风险等级", record.get("rule_severity"))}
-        {_record_field("AI 风险等级", record.get("ai_risk_level"))}
+        {_record_display_field("规则风险等级", record.get("rule_severity"), display_risk_level)}
+        {_record_display_field("AI 风险等级", record.get("ai_risk_level"), display_risk_level)}
       </dl>
     </section>
 
     <section>
       <h2>报告信息</h2>
       <dl class="detail-grid">
-        {_record_field("报告路径", record.get("report_path"))}
+        {_record_field("报告路径 (report_path)", record.get("report_path"))}
         {_record_field("接口消息", record.get("message"))}
       </dl>
     </section>
@@ -317,7 +434,7 @@ def record_detail_page(record_id: int) -> HTMLResponse:
       <h2>告警信息</h2>
       <dl class="detail-grid">
         {_record_field("告警数量", record.get("alert_count"))}
-        {_record_field("告警状态", record.get("webhook_status"))}
+        {_record_display_field("告警状态", record.get("webhook_status"), display_webhook_status)}
       </dl>
     </section>
 
@@ -373,10 +490,28 @@ def _record_field(label: str, value: object) -> str:
     )
 
 
+def _record_display_field(label: str, value: object, display_func) -> str:
+    return (
+        f"<dt>{escape(label)}</dt>"
+        f"<dd>{_record_display_with_raw(value, display_func)}</dd>"
+    )
+
+
 def _record_detail_value(value: object) -> str:
     if value is None or value == "":
         return "-"
     return escape(str(value))
+
+
+def _record_display_with_raw(value: object, display_func) -> str:
+    if value is None or value == "":
+        return "-"
+
+    raw_value = str(value)
+    display_value = display_func(raw_value)
+    if display_value == raw_value:
+        return escape(raw_value)
+    return f"{escape(display_value)}（{escape(raw_value)}）"
 
 
 def _record_page_style() -> str:
