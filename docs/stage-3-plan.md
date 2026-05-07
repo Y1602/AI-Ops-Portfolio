@@ -67,6 +67,8 @@ reports/
 - 不包含权限管理
 - 不包含 IP 白名单
 - 不包含签名验签
+- Token 校验只保护 `POST /alerts/alertmanager`
+- 不影响 `/logs/ingest`
 
 ## 5. 下一步计划
 

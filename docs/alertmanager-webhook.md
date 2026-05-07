@@ -128,6 +128,18 @@ X-Alertmanager-Token: <token>
 ALERTMANAGER_WEBHOOK_TOKEN=change-me-demo-token
 ```
 
+Docker Compose 会从项目根目录 `.env` 读取该变量并注入后端容器。修改 `.env` 后需要重启服务：
+
+```bash
+docker compose up -d --build
+```
+
+可以通过配置检查接口确认是否已启用 Token 校验，该接口不会返回 Token 明文：
+
+```bash
+curl http://127.0.0.1:8000/config/check
+```
+
 携带正确 Token 的请求示例：
 
 ```bash
@@ -151,6 +163,16 @@ curl -i -X POST http://127.0.0.1:8000/alerts/alertmanager \
 ```text
 HTTP/1.1 401 Unauthorized
 ```
+
+错误响应：
+
+```json
+{
+  "error": "invalid alertmanager webhook token"
+}
+```
+
+Token 校验只保护 `POST /alerts/alertmanager`，不影响 `/logs/ingest`、`/health` 或其他接口。不要提交真实 `.env` 或真实 Token。
 
 该 Token 校验只是 Demo 项目的基础保护示例，不等于完整认证授权系统。
 

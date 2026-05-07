@@ -235,7 +235,7 @@ python scripts/collect_recent_logs.py \
 
 `alertmanager_alert` 会生成偏向监控告警排查的 Markdown 报告。
 
-Alertmanager Webhook 支持可选 Token 校验，详细说明见接入文档。
+Alertmanager Webhook 支持可选 Token 校验，只保护 `POST /alerts/alertmanager`，不影响 `/logs/ingest`，详细说明见接入文档。
 
 新增接口：
 

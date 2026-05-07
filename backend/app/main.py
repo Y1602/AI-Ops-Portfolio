@@ -103,6 +103,9 @@ def config_check() -> dict:
             "https://dashscope.aliyuncs.com/compatible-mode/v1",
         ),
         "qwen_model": os.getenv("QWEN_MODEL", "qwen-plus"),
+        "alertmanager_webhook_token_configured": bool(
+            os.getenv("ALERTMANAGER_WEBHOOK_TOKEN", "").strip()
+        ),
     }
 
 
@@ -124,7 +127,7 @@ def logs_ingest(request: IngestLogRequest) -> dict:
 @app.post("/alerts/alertmanager")
 def alerts_alertmanager(
     payload: dict,
-    x_alertmanager_token: str | None = Header(default=None),
+    x_alertmanager_token: str | None = Header(default=None, alias="X-Alertmanager-Token"),
 ) -> dict:
     if not is_alertmanager_token_valid(x_alertmanager_token):
         return JSONResponse(

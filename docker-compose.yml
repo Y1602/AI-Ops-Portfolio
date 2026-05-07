@@ -9,6 +9,7 @@ services:
       - DASHSCOPE_BASE_URL=${DASHSCOPE_BASE_URL}
       - QWEN_MODEL=${QWEN_MODEL}
       - REPORTS_DIR=/app/reports
+      - ALERTMANAGER_WEBHOOK_TOKEN=${ALERTMANAGER_WEBHOOK_TOKEN:-}
     volumes:
       - ./reports:/app/reports
     restart: unless-stopped
