@@ -20,11 +20,21 @@ from app.services.report_service import (
     generate_markdown_report,
     save_report_to_file,
 )
+from app.storage.history_store import init_db
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 load_dotenv(PROJECT_ROOT / ".env", override=False)
 
 app = FastAPI(title="AI-OpsLog", version="0.1.0")
+
+
+@app.on_event("startup")
+def startup_init_db() -> None:
+    try:
+        init_db()
+    except Exception as exc:
+        print(f"failed to initialize AI-OpsLog SQLite database: {exc}")
+        raise
 
 
 @app.get("/health")

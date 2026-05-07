@@ -1,9 +1,10 @@
 from app.schemas.request_schema import IngestLogRequest
 from app.services.ai_analysis_service import analyze_log_with_ai
 from app.services.report_service import generate_ai_markdown_report, save_report_to_file
+from app.storage.history_store import save_analysis_record
 
 
-def ingest_log(request_data: IngestLogRequest) -> dict:
+def ingest_log(request_data: IngestLogRequest, save_history: bool = True) -> dict:
     try:
         source = request_data.source
         service_name = request_data.service_name
@@ -50,6 +51,24 @@ def ingest_log(request_data: IngestLogRequest) -> dict:
 
         if report_path.startswith("failed to save report:"):
             response["error"] = "failed to save report"
+        elif save_history:
+            try:
+                save_analysis_record(
+                    {
+                        "source": response.get("source"),
+                        "service_name": response.get("service_name"),
+                        "env": response.get("env"),
+                        "log_type": response.get("log_type"),
+                        "rule_severity": response.get("rule_severity"),
+                        "ai_risk_level": response.get("ai_risk_level"),
+                        "report_path": response.get("report_path"),
+                        "message": response.get("message"),
+                        "alert_count": None,
+                        "webhook_status": None,
+                    }
+                )
+            except Exception as exc:
+                print(f"failed to save analysis history record: {exc}")
 
         return response
     except Exception as exc:

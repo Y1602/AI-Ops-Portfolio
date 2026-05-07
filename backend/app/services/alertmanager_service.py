@@ -2,6 +2,7 @@ import os
 
 from app.schemas.request_schema import IngestLogRequest
 from app.services.ingest_service import ingest_log
+from app.storage.history_store import save_analysis_record
 
 
 def is_alertmanager_token_valid(provided_token: str | None) -> bool:
@@ -30,12 +31,29 @@ def ingest_alertmanager_webhook(payload: dict) -> dict:
         log_type="alertmanager_alert",
         log_text=alert_text,
     )
-    response = ingest_log(request)
+    response = ingest_log(request, save_history=False)
     response["alert_count"] = len(alerts)
     response["webhook_status"] = payload.get("status", "unknown")
 
     if not response.get("error"):
         response["message"] = "alertmanager webhook ingested and report generated"
+        try:
+            save_analysis_record(
+                {
+                    "source": response.get("source"),
+                    "service_name": response.get("service_name"),
+                    "env": response.get("env"),
+                    "log_type": "alertmanager_alert",
+                    "rule_severity": response.get("rule_severity"),
+                    "ai_risk_level": response.get("ai_risk_level"),
+                    "report_path": response.get("report_path"),
+                    "message": response.get("message"),
+                    "alert_count": response.get("alert_count"),
+                    "webhook_status": response.get("webhook_status"),
+                }
+            )
+        except Exception as exc:
+            print(f"failed to save alertmanager analysis history record: {exc}")
 
     return response
 
