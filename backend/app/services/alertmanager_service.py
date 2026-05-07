@@ -1,5 +1,14 @@
+import os
+
 from app.schemas.request_schema import IngestLogRequest
 from app.services.ingest_service import ingest_log
+
+
+def is_alertmanager_token_valid(provided_token: str | None) -> bool:
+    expected_token = os.getenv("ALERTMANAGER_WEBHOOK_TOKEN", "").strip()
+    if not expected_token:
+        return True
+    return provided_token == expected_token
 
 
 def ingest_alertmanager_webhook(payload: dict) -> dict:

@@ -110,7 +110,51 @@ curl -X POST http://127.0.0.1:8000/alerts/alertmanager \
 ls -lh reports/
 ```
 
-## 9. 告警报告结构
+## 9. Webhook Token 校验
+
+AI-OpsLog 支持通过 `ALERTMANAGER_WEBHOOK_TOKEN` 启用简单 Token 校验。
+
+如果未设置该环境变量，则不启用 Token 校验，方便本地 Demo 测试。
+
+如果设置了该环境变量，请求需要携带：
+
+```text
+X-Alertmanager-Token: <token>
+```
+
+启用示例：
+
+```env
+ALERTMANAGER_WEBHOOK_TOKEN=change-me-demo-token
+```
+
+携带正确 Token 的请求示例：
+
+```bash
+curl -X POST http://127.0.0.1:8000/alerts/alertmanager \
+  -H "Content-Type: application/json" \
+  -H "X-Alertmanager-Token: change-me-demo-token" \
+  -d @examples/alertmanager_webhook_high_cpu.json
+```
+
+错误 Token 示例：
+
+```bash
+curl -i -X POST http://127.0.0.1:8000/alerts/alertmanager \
+  -H "Content-Type: application/json" \
+  -H "X-Alertmanager-Token: wrong-token" \
+  -d @examples/alertmanager_webhook_high_cpu.json
+```
+
+预期：
+
+```text
+HTTP/1.1 401 Unauthorized
+```
+
+该 Token 校验只是 Demo 项目的基础保护示例，不等于完整认证授权系统。
+
+## 10. 告警报告结构
 
 Alertmanager 告警报告主要包含：
 
@@ -123,7 +167,7 @@ Alertmanager 告警报告主要包含：
 
 AI 输出的命令或步骤仅作为人工排查参考，AI-OpsLog 不会自动执行任何系统命令。
 
-## 10. 后续方向
+## 11. 后续方向
 
 - 接入真实 Alertmanager
 - 增加更多告警类型规则

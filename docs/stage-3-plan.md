@@ -19,6 +19,9 @@
 - 支持 resolved 告警事件示例
 - 支持在告警文本和报告中区分 firing 与 resolved
 - resolved 告警仍生成一份分析报告，但不做生命周期追踪
+- 支持可选 Alertmanager Webhook Token 校验
+- 通过 `ALERTMANAGER_WEBHOOK_TOKEN` 环境变量启用
+- 请求 Header 使用 `X-Alertmanager-Token`
 - 不影响原有 `/logs/ingest` 日志分析接口
 
 ## 3. 当前链路
@@ -58,10 +61,15 @@ reports/
 - 不做 Web 页面
 - 不自动执行修复命令
 - AI 输出只作为人工排查参考
+- Token 校验只是基础保护示例
+- 不包含用户系统
+- 不包含 JWT/OAuth
+- 不包含权限管理
+- 不包含 IP 白名单
+- 不包含签名验签
 
 ## 5. 下一步计划
 
 - 增加更多 Alertmanager 示例
-- 增加 Webhook 安全说明
 - 增加真实 Alertmanager 配置示例
 - 后续接入历史记录存储
