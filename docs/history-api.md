@@ -35,6 +35,8 @@ curl -s http://127.0.0.1:8000/history/1 | python -m json.tool
 
 ## 响应示例
 
+`GET /history/recent` 响应示例：
+
 ```json
 {
   "records": [
@@ -54,6 +56,36 @@ curl -s http://127.0.0.1:8000/history/1 | python -m json.tool
     }
   ],
   "count": 1
+}
+```
+
+无匹配结果响应示例：
+
+```json
+{
+  "records": [],
+  "count": 0
+}
+```
+
+`GET /history/{id}` 响应示例：
+
+```json
+{
+  "record": {
+    "id": 1,
+    "created_at": "2026-05-07T05:02:44.222958+00:00",
+    "source": "docker-host-01",
+    "service_name": "redis-container",
+    "env": "dev",
+    "log_type": "docker_log",
+    "rule_severity": "high",
+    "ai_risk_level": "high",
+    "report_path": "app/reports/xxx.md",
+    "message": "log ingested and report generated",
+    "alert_count": null,
+    "webhook_status": null
+  }
 }
 ```
 

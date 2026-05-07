@@ -6,7 +6,7 @@
 
 ## 2. 第一步：SQLite 写入闭环
 
-第一步实现最小 SQLite 写入闭环：
+第一步已完成最小 SQLite 写入闭环：
 
 - 初始化数据库
 - 创建 `analysis_records` 表
@@ -15,7 +15,7 @@
 
 ## 3. 第二步：历史记录查询接口
 
-第二步新增基础历史记录查询接口：
+第二步已完成基础历史记录查询接口：
 
 - `GET /history/recent`
 - `GET /history/recent?limit=5`
@@ -37,7 +37,20 @@
 
 当前只支持精确匹配，不支持模糊搜索和时间范围查询。
 
-## 5. 数据库字段
+## 5. 第四步：阶段总结和收尾
+
+第四步用于整理第四阶段文档，不新增功能：
+
+- 新增第四阶段总结文档
+- 检查 README 第四阶段说明
+- 检查历史记录 API 文档
+- 检查 `data/README.md`
+- 确认 `.gitignore` 忽略运行时数据库文件
+- 确认 `.env.example` 包含 SQLite 配置
+
+总结文档见：[docs/stage-4-summary.md](stage-4-summary.md)。
+
+## 6. 数据库字段
 
 `analysis_records` 表字段如下：
 
@@ -56,7 +69,7 @@
 | `alert_count` | Alertmanager 告警数量，普通日志为空 |
 | `webhook_status` | Alertmanager Webhook 状态，例如 `firing`、`resolved`，普通日志为空 |
 
-## 6. 当前边界
+## 7. 当前边界
 
 - 当前使用 SQLite
 - 当前不接 MySQL
@@ -71,7 +84,7 @@
 - 当前不保存 API Key
 - 当前不保存 Webhook Token
 
-## 7. 后续计划
+## 8. 后续计划
 
 - 支持时间范围查询
 - 支持简单统计接口

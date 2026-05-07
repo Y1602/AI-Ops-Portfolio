@@ -257,9 +257,9 @@ curl -X POST http://127.0.0.1:8000/alerts/alertmanager \
 
 ## 第四阶段：SQLite 历史记录存储
 
-第四阶段新增 SQLite 历史记录存储能力。成功的日志分析和 Alertmanager 告警分析会将关键元数据写入 `analysis_records` 表，便于后续增加查询接口和简单展示。
+第四阶段新增 SQLite 历史记录存储能力。成功的 `/logs/ingest` 日志分析和 `/alerts/alertmanager` 告警分析会将关键元数据写入 `analysis_records` 表，便于后续增加查询接口和简单展示。
 
-默认数据库路径为 `data/ai_opslog.db`。详细说明见：[docs/stage-4-plan.md](docs/stage-4-plan.md)。
+默认数据库路径为 `data/ai_opslog.db`。阶段计划见：[docs/stage-4-plan.md](docs/stage-4-plan.md)，阶段总结见：[docs/stage-4-summary.md](docs/stage-4-summary.md)。
 
 ### 历史记录查询
 
