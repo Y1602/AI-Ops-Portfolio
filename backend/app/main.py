@@ -105,7 +105,7 @@ def dashboard() -> HTMLResponse:
     table {{
       width: 100%;
       border-collapse: collapse;
-      min-width: 1040px;
+      min-width: 1120px;
     }}
     th, td {{
       padding: 10px 12px;
@@ -210,6 +210,7 @@ def _render_dashboard_rows(records: list[dict]) -> str:
             f"<td>{_dashboard_value(record.get('alert_count'))}</td>"
             f"<td>{_dashboard_value(record.get('webhook_status'))}</td>"
             f'<td class="path">{_dashboard_value(record.get("report_path"))}</td>'
+            f'<td><a href="/records/{_dashboard_value(record.get("id"))}">查看详情</a></td>'
             "</tr>"
         )
 
@@ -229,6 +230,7 @@ def _render_dashboard_rows(records: list[dict]) -> str:
         "<th>告警数量</th>"
         "<th>告警状态</th>"
         "<th>报告路径</th>"
+        "<th>操作</th>"
         "</tr>"
         "</thead>"
         f"<tbody>{''.join(rows)}</tbody>"
@@ -241,6 +243,234 @@ def _dashboard_value(value: object) -> str:
     if value is None:
         return ""
     return escape(str(value))
+
+
+@app.get("/records/{record_id}", response_class=HTMLResponse)
+def record_detail_page(record_id: int) -> HTMLResponse:
+    try:
+        record = get_analysis_record_by_id(record_id)
+    except Exception as exc:
+        return HTMLResponse(
+            content=_render_record_error_page(
+                title="历史记录查询失败",
+                message=f"数据库查询失败：{exc}",
+                status_code=500,
+            ),
+            status_code=500,
+        )
+
+    if record is None:
+        return HTMLResponse(
+            content=_render_record_error_page(
+                title="历史记录不存在",
+                message=f"未找到 ID 为 {record_id} 的历史记录。",
+                status_code=404,
+            ),
+            status_code=404,
+        )
+
+    html = f"""
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI-OpsLog 历史记录详情</title>
+  {_record_page_style()}
+</head>
+<body>
+  <main class="page">
+    <header>
+      <h1>AI-OpsLog 历史记录详情</h1>
+      <p class="subtitle">查看 SQLite 中保存的单条分析元数据</p>
+    </header>
+
+    <section>
+      <h2>基本信息</h2>
+      <dl class="detail-grid">
+        {_record_field("ID", record.get("id"))}
+        {_record_field("创建时间", record.get("created_at"))}
+        {_record_field("来源", record.get("source"))}
+        {_record_field("服务名", record.get("service_name"))}
+        {_record_field("环境", record.get("env"))}
+        {_record_field("类型", record.get("log_type"))}
+      </dl>
+    </section>
+
+    <section>
+      <h2>风险信息</h2>
+      <dl class="detail-grid">
+        {_record_field("规则风险等级", record.get("rule_severity"))}
+        {_record_field("AI 风险等级", record.get("ai_risk_level"))}
+      </dl>
+    </section>
+
+    <section>
+      <h2>报告信息</h2>
+      <dl class="detail-grid">
+        {_record_field("报告路径", record.get("report_path"))}
+        {_record_field("接口消息", record.get("message"))}
+      </dl>
+    </section>
+
+    <section>
+      <h2>告警信息</h2>
+      <dl class="detail-grid">
+        {_record_field("告警数量", record.get("alert_count"))}
+        {_record_field("告警状态", record.get("webhook_status"))}
+      </dl>
+    </section>
+
+    <section>
+      <h2>相关入口</h2>
+      <div class="links">
+        <a href="/">返回首页</a>
+        <a href="/history/{_record_detail_value(record.get("id"))}">查看 JSON API：/history/{_record_detail_value(record.get("id"))}</a>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
+"""
+    return HTMLResponse(content=html)
+
+
+def _render_record_error_page(title: str, message: str, status_code: int) -> str:
+    return f"""
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI-OpsLog {escape(title)}</title>
+  {_record_page_style()}
+</head>
+<body>
+  <main class="page">
+    <header>
+      <h1>AI-OpsLog 历史记录详情</h1>
+      <p class="subtitle">HTTP {status_code}</p>
+    </header>
+    <section>
+      <div class="notice error">
+        <strong>{escape(title)}</strong>
+        <p>{escape(message)}</p>
+      </div>
+      <div class="links">
+        <a href="/">返回首页</a>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
+"""
+
+
+def _record_field(label: str, value: object) -> str:
+    return (
+        f"<dt>{escape(label)}</dt>"
+        f"<dd>{_record_detail_value(value)}</dd>"
+    )
+
+
+def _record_detail_value(value: object) -> str:
+    if value is None or value == "":
+        return "-"
+    return escape(str(value))
+
+
+def _record_page_style() -> str:
+    return """
+  <style>
+    body {
+      margin: 0;
+      background: #f6f8fa;
+      color: #1f2937;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+      line-height: 1.5;
+    }
+    .page {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 32px 20px 40px;
+    }
+    header {
+      margin-bottom: 24px;
+    }
+    h1 {
+      margin: 0 0 8px;
+      font-size: 30px;
+      font-weight: 700;
+    }
+    h2 {
+      margin: 0 0 12px;
+      font-size: 20px;
+    }
+    section {
+      margin-top: 24px;
+    }
+    .subtitle {
+      margin: 0;
+      color: #4b5563;
+      font-size: 15px;
+    }
+    .detail-grid {
+      display: grid;
+      grid-template-columns: 180px minmax(0, 1fr);
+      margin: 0;
+      background: #ffffff;
+      border: 1px solid #d8dee4;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    dt, dd {
+      margin: 0;
+      padding: 11px 14px;
+      border-bottom: 1px solid #e5e7eb;
+      font-size: 14px;
+    }
+    dt {
+      background: #f3f4f6;
+      color: #374151;
+      font-weight: 600;
+    }
+    dd {
+      overflow-wrap: anywhere;
+    }
+    dt:nth-last-of-type(1), dd:nth-last-of-type(1) {
+      border-bottom: 0;
+    }
+    .notice {
+      padding: 16px;
+      background: #ffffff;
+      border: 1px solid #d8dee4;
+      border-radius: 8px;
+      color: #4b5563;
+    }
+    .error {
+      border-color: #f1b7b7;
+      background: #fff5f5;
+      color: #991b1b;
+    }
+    .links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 8px;
+    }
+    .links a {
+      display: inline-block;
+      padding: 6px 10px;
+      border: 1px solid #d8dee4;
+      border-radius: 6px;
+      background: #ffffff;
+      color: #1f2937;
+      text-decoration: none;
+      font-size: 13px;
+      font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+    }
+  </style>
+"""
 
 
 @app.get("/health")

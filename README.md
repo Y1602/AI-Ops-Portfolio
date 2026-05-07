@@ -299,15 +299,17 @@ curl "http://127.0.0.1:8000/history/recent?log_type=alertmanager_alert&webhook_s
 当前页面：
 
 - `GET /`：展示最近分析记录
+- `GET /records/{id}`：展示单条历史记录详情
 - `GET /history/recent`：查询最近历史记录
 - `GET /history/{id}`：查询单条历史记录
 
-当前展示页面只用于 Demo 和项目展示，不是完整前端系统。阶段计划见：[docs/stage-5-plan.md](docs/stage-5-plan.md)。
+详情页只展示 SQLite 中保存的分析元数据，不读取 Markdown 报告正文。当前展示页面只用于 Demo 和项目展示，不是完整前端系统。阶段计划见：[docs/stage-5-plan.md](docs/stage-5-plan.md)。
 
 ## 6. API 接口说明
 
 - `GET /health`: 健康检查
 - `GET /`: 最小 Web 展示页面
+- `GET /records/{id}`: 单条历史记录详情页面
 - `GET /config/check`: 检查 DashScope 配置是否已加载，不返回 API Key 原文
 - `GET /qwen/test`: 测试通义千问连接
 - `GET /reports/check`: 检查报告目录状态
