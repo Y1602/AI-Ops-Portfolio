@@ -74,6 +74,9 @@ def generate_markdown_report(result: dict) -> str:
 def generate_ai_markdown_report(result: dict, metadata: Optional[dict] = None) -> str:
     try:
         log_type = result.get("log_type", "unknown")
+        if log_type == "alertmanager_alert":
+            return _generate_alertmanager_ai_markdown_report(result, metadata=metadata)
+
         rule_result = result.get("rule_result") or {}
         ai_result = result.get("ai_result") or {}
         rule_severity = rule_result.get("severity", "unknown")
@@ -167,6 +170,90 @@ def generate_ai_markdown_report(result: dict, metadata: Optional[dict] = None) -
                 "",
             ]
         )
+
+
+def _generate_alertmanager_ai_markdown_report(result: dict, metadata: Optional[dict] = None) -> str:
+    log_type = result.get("log_type", "unknown")
+    rule_result = result.get("rule_result") or {}
+    ai_result = result.get("ai_result") or {}
+    metadata = metadata or {}
+    rule_severity = rule_result.get("severity", "unknown")
+    ai_risk_level = ai_result.get("risk_level", "unknown")
+    report_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    lines = [
+        "# AI-OpsLog Alertmanager 告警分析报告",
+        "",
+        "## 1. 告警基本信息",
+        "",
+        f"- Source: {metadata.get('source', 'unknown')}",
+        f"- Service Name: {metadata.get('service_name', 'unknown')}",
+        f"- Environment: {metadata.get('env', 'unknown')}",
+        f"- Log Type: {log_type}",
+        f"- Alert Count: {_extract_alert_count(rule_result)}",
+        f"- Rule Severity: {rule_severity}",
+        f"- AI Risk Level: {ai_risk_level}",
+        f"- Report Time: {report_time}",
+        "",
+        "## 2. 告警事件内容",
+        "",
+    ]
+
+    sample_lines = rule_result.get("sample_lines") or []
+    if sample_lines:
+        lines.extend(["```text", *sample_lines, "```"])
+    else:
+        lines.append("无告警事件内容。")
+
+    lines.extend(["", "## 3. AI 告警分析", ""])
+    if isinstance(ai_result, dict) and ai_result.get("error"):
+        lines.append(f"- AI 调用失败：{ai_result.get('error')}")
+        if ai_result.get("detail"):
+            lines.append(f"- 错误详情：{ai_result.get('detail')}")
+        lines.append("- 当前报告仅包含规则分析结果。")
+    else:
+        lines.extend(
+            [
+                f"- 告警摘要：{ai_result.get('summary') or 'AI 未返回告警摘要。'}",
+                f"- 风险等级判断：{ai_risk_level}",
+                "",
+                "### 可能原因",
+                "",
+                *_format_list(ai_result.get("possible_causes"), "AI 未返回可能原因。"),
+                "",
+                "### 排查步骤",
+                "",
+                *_format_list(ai_result.get("troubleshooting_steps"), "AI 未返回排查步骤。"),
+            ]
+        )
+
+    lines.extend(["", "## 4. 人工排查建议", ""])
+    lines.extend(_format_list(ai_result.get("fix_suggestions"), "AI 未返回人工处理建议。"))
+    lines.extend(["", "### 建议查看的指标或命令", ""])
+    safe_commands = _filter_safe_commands(ai_result.get("related_commands"))
+    if safe_commands:
+        for command in safe_commands:
+            lines.append(f"- `{command}`")
+    else:
+        lines.append("无安全的建议排查命令。")
+
+    lines.extend(
+        [
+            "",
+            "AI 输出的命令或步骤仅供人工排查参考，AI-OpsLog 不会自动执行任何系统命令。",
+            "AI 分析结果不能直接作为生产环境自动操作依据。",
+            "",
+        ]
+    )
+
+    return "\n".join(lines)
+
+
+def _extract_alert_count(rule_result: dict) -> str:
+    for sample in rule_result.get("sample_lines") or []:
+        if sample.startswith("- Alert Count:"):
+            return sample.removeprefix("- Alert Count:").strip()
+    return "unknown"
 
 
 def save_report_to_file(

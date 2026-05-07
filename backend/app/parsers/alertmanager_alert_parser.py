@@ -8,8 +8,6 @@ def parse(log_text: str) -> dict:
     summary = _extract_field(lines, "Summary") or "No alert summary."
     description = _extract_field(lines, "Description") or "No alert description."
 
-    sample_lines = lines[:20]
-
     return {
         "log_type": "alertmanager_alert",
         "total_lines": len(lines),
@@ -21,24 +19,26 @@ def parse(log_text: str) -> dict:
             "instance": instance,
         },
         "error_summary": f"{alert_name} on {instance}: {summary}. {description}",
-        "sample_lines": sample_lines,
+        "sample_lines": lines,
     }
 
 
 def _extract_field(lines: list[str], field_name: str) -> str | None:
-    prefix = f"{field_name}:"
+    prefixes = (f"{field_name}:", f"- {field_name}:")
     for line in lines:
-        if line.startswith(prefix):
-            return line[len(prefix) :].strip()
+        for prefix in prefixes:
+            if line.startswith(prefix):
+                return line[len(prefix) :].strip()
     return None
 
 
 def _extract_fields(lines: list[str], field_name: str) -> list[str]:
-    prefix = f"{field_name}:"
+    prefixes = (f"{field_name}:", f"- {field_name}:")
     values = []
     for line in lines:
-        if line.startswith(prefix):
-            values.append(line[len(prefix) :].strip())
+        for prefix in prefixes:
+            if line.startswith(prefix):
+                values.append(line[len(prefix) :].strip())
     return values
 
 

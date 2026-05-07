@@ -6,6 +6,8 @@ AI-OpsLog 第三阶段新增 `POST /alerts/alertmanager`，用于接收 Alertman
 
 当前接口会将 Alertmanager Webhook JSON 转换为告警事件文本，然后复用现有规则分析、通义千问 AI 分析和 Markdown 报告生成链路。
 
+`alertmanager_alert` 会生成偏向监控告警排查的 Markdown 报告，与普通 Docker/Nginx 日志报告不同。报告会突出告警基本信息、告警事件内容、AI 告警分析和人工排查建议。
+
 ## 2. 当前边界
 
 - 当前不部署 Prometheus
@@ -92,7 +94,20 @@ curl -i -X POST http://127.0.0.1:8000/alerts/alertmanager \
 ls -lh reports/
 ```
 
-## 8. 后续方向
+## 8. 告警报告结构
+
+Alertmanager 告警报告主要包含：
+
+- 告警基本信息：source、service_name、env、log_type、alert_count、rule_severity、AI risk level、report time
+- 告警事件内容：展示转换后的 Alertmanager Webhook 事件文本
+- AI 告警分析：偏向告警含义、影响范围、可能原因、风险判断和优先级
+- 人工排查建议：展示排查步骤和只读排查命令
+
+多条 alerts 会合并到同一份报告中，报告内容会包含 `Alert #1`、`Alert #2` 等告警详情。
+
+AI 输出的命令或步骤仅作为人工排查参考，AI-OpsLog 不会自动执行任何系统命令。
+
+## 9. 后续方向
 
 - 接入真实 Alertmanager
 - 增加更多告警类型规则

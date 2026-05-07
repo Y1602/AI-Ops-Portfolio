@@ -32,12 +32,19 @@ def ingest_alertmanager_webhook(payload: dict) -> dict:
 
 def alertmanager_payload_to_text(payload: dict) -> str:
     alerts = payload.get("alerts") or []
+    common_labels = payload.get("commonLabels") or {}
     lines = [
         "Alertmanager Webhook Event",
         "",
-        f"Receiver: {payload.get('receiver', 'alertmanager')}",
-        f"Webhook Status: {payload.get('status', 'unknown')}",
-        f"Alert Count: {len(alerts)}",
+        "Event Summary:",
+        f"- Receiver: {payload.get('receiver', 'alertmanager')}",
+        f"- Webhook Status: {payload.get('status', 'unknown')}",
+        f"- Alert Count: {len(alerts)}",
+        f"- Common Severity: {common_labels.get('severity') or _highest_raw_severity(alerts)}",
+        f"- Common Alert Name: {common_labels.get('alertname', 'mixed')}",
+        f"- External URL: {payload.get('externalURL', 'unknown')}",
+        "",
+        "Alert Details:",
         "",
     ]
 
@@ -47,16 +54,16 @@ def alertmanager_payload_to_text(payload: dict) -> str:
         lines.extend(
             [
                 f"Alert #{index}",
-                f"Alert Name: {labels.get('alertname', 'alertmanager-alert')}",
-                f"Status: {alert.get('status', 'unknown')}",
-                f"Severity: {labels.get('severity', 'unknown')}",
-                f"Instance: {labels.get('instance', 'alertmanager')}",
-                f"Job: {labels.get('job', 'unknown')}",
-                f"Summary: {annotations.get('summary', 'no summary')}",
-                f"Description: {annotations.get('description', 'no description')}",
-                f"Starts At: {alert.get('startsAt', 'unknown')}",
-                f"Ends At: {alert.get('endsAt', 'unknown')}",
-                f"Generator URL: {alert.get('generatorURL', 'unknown')}",
+                f"- Alert Name: {labels.get('alertname', 'alertmanager-alert')}",
+                f"- Status: {alert.get('status', 'unknown')}",
+                f"- Severity: {labels.get('severity', 'unknown')}",
+                f"- Instance: {labels.get('instance', 'alertmanager')}",
+                f"- Job: {labels.get('job', 'unknown')}",
+                f"- Summary: {annotations.get('summary', 'no summary')}",
+                f"- Description: {annotations.get('description', 'no description')}",
+                f"- Starts At: {alert.get('startsAt', 'unknown')}",
+                f"- Ends At: {alert.get('endsAt', 'unknown')}",
+                f"- Generator URL: {alert.get('generatorURL', 'unknown')}",
                 "",
             ]
         )
@@ -69,3 +76,17 @@ def _first_alert(payload: dict) -> dict:
     if alerts and isinstance(alerts[0], dict):
         return alerts[0]
     return {}
+
+
+def _highest_raw_severity(alerts: list[dict]) -> str:
+    severities = []
+    for alert in alerts:
+        labels = alert.get("labels") or {}
+        severities.append(str(labels.get("severity", "unknown")).lower())
+    if "critical" in severities:
+        return "critical"
+    if "warning" in severities:
+        return "warning"
+    if "info" in severities:
+        return "info"
+    return "unknown"

@@ -231,6 +231,8 @@ python scripts/collect_recent_logs.py \
 
 当前支持单条告警样例、多条 alerts 合并为一份报告、字段缺省处理；空 `alerts` 会返回错误。
 
+`alertmanager_alert` 会生成偏向监控告警排查的 Markdown 报告。
+
 新增接口：
 
 ```text
@@ -245,7 +247,7 @@ curl -X POST http://127.0.0.1:8000/alerts/alertmanager \
   -d @examples/alertmanager_webhook_high_cpu.json
 ```
 
-详细说明见：[docs/alertmanager-webhook.md](docs/alertmanager-webhook.md)。
+详细说明见：[docs/alertmanager-webhook.md](docs/alertmanager-webhook.md) 和 [docs/stage-3-plan.md](docs/stage-3-plan.md)。
 
 ## 6. API 接口说明
 
