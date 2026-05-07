@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 
-from fastapi import FastAPI, Header
+from fastapi import FastAPI, Header, HTTPException
 from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 
@@ -20,7 +20,11 @@ from app.services.report_service import (
     generate_markdown_report,
     save_report_to_file,
 )
-from app.storage.history_store import init_db
+from app.storage.history_store import (
+    get_analysis_record_by_id,
+    get_recent_analysis_records,
+    init_db,
+)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 load_dotenv(PROJECT_ROOT / ".env", override=False)
@@ -127,6 +131,37 @@ def qwen_test() -> dict:
 @app.get("/reports/check")
 def reports_check() -> dict:
     return check_reports_dir()
+
+
+@app.get("/history/recent")
+def history_recent(limit: int = 10) -> dict:
+    if limit <= 0:
+        raise HTTPException(status_code=400, detail="limit must be greater than 0")
+    if limit > 100:
+        raise HTTPException(status_code=400, detail="limit must be less than or equal to 100")
+
+    try:
+        records = get_recent_analysis_records(limit=limit)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"failed to query history records: {exc}") from exc
+
+    return {
+        "records": records,
+        "count": len(records),
+    }
+
+
+@app.get("/history/{record_id}")
+def history_record(record_id: int) -> dict:
+    try:
+        record = get_analysis_record_by_id(record_id)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"failed to query history record: {exc}") from exc
+
+    if record is None:
+        raise HTTPException(status_code=404, detail="history record not found")
+
+    return {"record": record}
 
 
 @app.post("/logs/ingest")

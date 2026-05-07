@@ -7,6 +7,21 @@ from typing import Any
 
 DEFAULT_DB_PATH = "data/ai_opslog.db"
 
+ANALYSIS_RECORD_COLUMNS = """
+    id,
+    created_at,
+    source,
+    service_name,
+    env,
+    log_type,
+    rule_severity,
+    ai_risk_level,
+    report_path,
+    message,
+    alert_count,
+    webhook_status
+"""
+
 
 def get_db_path() -> Path:
     return Path(os.getenv("AI_OPSLOG_DB_PATH", DEFAULT_DB_PATH))
@@ -36,6 +51,12 @@ def init_db() -> None:
             """
         )
         connection.commit()
+
+
+def _row_to_dict(row: sqlite3.Row | None) -> dict[str, Any] | None:
+    if row is None:
+        return None
+    return dict(row)
 
 
 def save_analysis_record(record: dict[str, Any]) -> int:
@@ -91,3 +112,39 @@ def save_analysis_record(record: dict[str, Any]) -> int:
         )
         connection.commit()
         return int(cursor.lastrowid)
+
+
+def get_recent_analysis_records(limit: int = 10) -> list[dict[str, Any]]:
+    normalized_limit = min(max(limit, 1), 100)
+    db_path = get_db_path()
+
+    with sqlite3.connect(db_path) as connection:
+        connection.row_factory = sqlite3.Row
+        rows = connection.execute(
+            f"""
+            SELECT
+                {ANALYSIS_RECORD_COLUMNS}
+            FROM analysis_records
+            ORDER BY id DESC
+            LIMIT ?;
+            """,
+            (normalized_limit,),
+        ).fetchall()
+        return [dict(row) for row in rows]
+
+
+def get_analysis_record_by_id(record_id: int) -> dict[str, Any] | None:
+    db_path = get_db_path()
+
+    with sqlite3.connect(db_path) as connection:
+        connection.row_factory = sqlite3.Row
+        row = connection.execute(
+            f"""
+            SELECT
+                {ANALYSIS_RECORD_COLUMNS}
+            FROM analysis_records
+            WHERE id = ?;
+            """,
+            (record_id,),
+        ).fetchone()
+        return _row_to_dict(row)

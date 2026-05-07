@@ -261,12 +261,24 @@ curl -X POST http://127.0.0.1:8000/alerts/alertmanager \
 
 默认数据库路径为 `data/ai_opslog.db`。详细说明见：[docs/stage-4-plan.md](docs/stage-4-plan.md)。
 
+### 历史记录查询
+
+第四阶段第二步新增基础历史记录查询接口：
+
+- `GET /history/recent`：查询最近分析记录
+- `GET /history/recent?limit=5`：限制返回数量，`limit` 范围为 1 到 100
+- `GET /history/{id}`：查询单条分析记录
+
+当前查询接口只返回 SQLite 中保存的分析元数据，不返回完整原始日志，也不读取 Markdown 报告正文。详细说明见：[docs/history-api.md](docs/history-api.md)。
+
 ## 6. API 接口说明
 
 - `GET /health`: 健康检查
 - `GET /config/check`: 检查 DashScope 配置是否已加载，不返回 API Key 原文
 - `GET /qwen/test`: 测试通义千问连接
 - `GET /reports/check`: 检查报告目录状态
+- `GET /history/recent`: 查询最近分析记录
+- `GET /history/{id}`: 查询单条分析记录
 - `POST /analyze`: 规则解析接口
 - `POST /analyze/report`: 规则 Markdown 报告接口
 - `POST /analyze/ai`: 通义千问辅助分析接口
