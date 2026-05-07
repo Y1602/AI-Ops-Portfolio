@@ -62,16 +62,28 @@ JSON 字段固定如下：
 
 
 def _build_alertmanager_analysis_prompt(log_type: str, raw_log: str, parsed_json: str) -> str:
-    return f"""你是一个运维/SRE 监控告警分析助手，负责根据 Alertmanager Webhook 告警事件和规则解析结果，生成告警辅助排查建议。
-
-请重点关注：
+    if "Event Type: alert_resolved" in raw_log:
+        focus_text = """这是 Alertmanager 恢复告警，说明当前告警状态已经 resolved。请重点关注：
+1. 故障是否已经恢复
+2. 恢复前可能的影响范围
+3. 是否需要继续观察
+4. 是否需要补充复盘
+5. 是否需要检查同类告警是否反复出现
+6. 建议查看的指标或只读排查命令
+7. 风险等级判断依据"""
+    else:
+        focus_text = """请重点关注：
 1. 告警含义
 2. 可能影响范围
 3. 可能原因
 4. 建议优先级
 5. 人工排查步骤
 6. 需要查看的指标或只读排查命令
-7. 风险等级判断依据
+7. 风险等级判断依据"""
+
+    return f"""你是一个运维/SRE 监控告警分析助手，负责根据 Alertmanager Webhook 告警事件和规则解析结果，生成告警辅助排查建议。
+
+{focus_text}
 
 请根据以下输入进行分析：
 

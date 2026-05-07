@@ -231,6 +231,8 @@ python scripts/collect_recent_logs.py \
 
 当前支持单条告警样例、多条 alerts 合并为一份报告、字段缺省处理；空 `alerts` 会返回错误。
 
+当前支持 firing 和 resolved 告警事件的基础识别，resolved 事件会生成恢复告警分析报告，但不做告警生命周期追踪。
+
 `alertmanager_alert` 会生成偏向监控告警排查的 Markdown 报告。
 
 新增接口：

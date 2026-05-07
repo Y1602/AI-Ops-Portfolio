@@ -23,6 +23,7 @@ def ingest_alertmanager_webhook(payload: dict) -> dict:
     )
     response = ingest_log(request)
     response["alert_count"] = len(alerts)
+    response["webhook_status"] = payload.get("status", "unknown")
 
     if not response.get("error"):
         response["message"] = "alertmanager webhook ingested and report generated"
@@ -39,6 +40,7 @@ def alertmanager_payload_to_text(payload: dict) -> str:
         "Event Summary:",
         f"- Receiver: {payload.get('receiver', 'alertmanager')}",
         f"- Webhook Status: {payload.get('status', 'unknown')}",
+        f"- Event Type: {_event_type(payload, alerts)}",
         f"- Alert Count: {len(alerts)}",
         f"- Common Severity: {common_labels.get('severity') or _highest_raw_severity(alerts)}",
         f"- Common Alert Name: {common_labels.get('alertname', 'mixed')}",
@@ -90,3 +92,13 @@ def _highest_raw_severity(alerts: list[dict]) -> str:
     if "info" in severities:
         return "info"
     return "unknown"
+
+
+def _event_type(payload: dict, alerts: list[dict]) -> str:
+    webhook_status = str(payload.get("status", "")).lower()
+    alert_statuses = [str(alert.get("status", "")).lower() for alert in alerts]
+    if webhook_status == "resolved" or (
+        alert_statuses and alert_statuses.count("resolved") >= alert_statuses.count("firing")
+    ):
+        return "alert_resolved"
+    return "alert_firing"

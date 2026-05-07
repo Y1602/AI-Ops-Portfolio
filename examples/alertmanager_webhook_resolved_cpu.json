@@ -1,0 +1,32 @@
+{
+  "receiver": "ai-opslog",
+  "status": "resolved",
+  "alerts": [
+    {
+      "status": "resolved",
+      "labels": {
+        "alertname": "HighCPUUsage",
+        "instance": "nginx-web-01",
+        "severity": "warning",
+        "job": "node-exporter"
+      },
+      "annotations": {
+        "summary": "High CPU usage recovered",
+        "description": "CPU usage has returned below threshold"
+      },
+      "startsAt": "2026-05-06T15:40:00Z",
+      "endsAt": "2026-05-06T15:55:00Z",
+      "generatorURL": "http://prometheus.example/graph?g0.expr=node_cpu_seconds_total"
+    }
+  ],
+  "groupLabels": {
+    "alertname": "HighCPUUsage"
+  },
+  "commonLabels": {
+    "severity": "warning"
+  },
+  "commonAnnotations": {
+    "summary": "High CPU usage recovered"
+  },
+  "externalURL": "http://alertmanager.example"
+}

@@ -88,13 +88,29 @@ curl -i -X POST http://127.0.0.1:8000/alerts/alertmanager \
 - 返回 `no alerts found` 相关错误
 - 不生成报告
 
-## 7. 查看报告
+## 7. resolved 告警测试
+
+```bash
+curl -X POST http://127.0.0.1:8000/alerts/alertmanager \
+  -H "Content-Type: application/json" \
+  -d @examples/alertmanager_webhook_resolved_cpu.json
+```
+
+预期：
+
+- `webhook_status` 或报告内容显示 `resolved`
+- 报告中体现这是恢复告警
+- 报告仍会生成
+- 不做生命周期追踪
+- 不关联历史 firing 事件
+
+## 8. 查看报告
 
 ```bash
 ls -lh reports/
 ```
 
-## 8. 告警报告结构
+## 9. 告警报告结构
 
 Alertmanager 告警报告主要包含：
 
@@ -107,7 +123,7 @@ Alertmanager 告警报告主要包含：
 
 AI 输出的命令或步骤仅作为人工排查参考，AI-OpsLog 不会自动执行任何系统命令。
 
-## 9. 后续方向
+## 10. 后续方向
 
 - 接入真实 Alertmanager
 - 增加更多告警类型规则

@@ -16,6 +16,9 @@
 - 支持空 alerts 返回 400
 - 支持 severity 到 rule_severity 的基础映射
 - 支持生成 Markdown 告警分析报告
+- 支持 resolved 告警事件示例
+- 支持在告警文本和报告中区分 firing 与 resolved
+- resolved 告警仍生成一份分析报告，但不做生命周期追踪
 - 不影响原有 `/logs/ingest` 日志分析接口
 
 ## 3. 当前链路
@@ -47,6 +50,10 @@ reports/
 - 不做告警去重
 - 不做告警静默
 - 不做通知分发
+- 不关联 firing 与 resolved 两次事件
+- 不记录告警状态历史
+- 不计算告警持续时间
+- 不做告警恢复通知
 - 不接数据库
 - 不做 Web 页面
 - 不自动执行修复命令
@@ -55,7 +62,6 @@ reports/
 ## 5. 下一步计划
 
 - 增加更多 Alertmanager 示例
-- 增加告警状态 resolved 处理说明
 - 增加 Webhook 安全说明
 - 增加真实 Alertmanager 配置示例
 - 后续接入历史记录存储
