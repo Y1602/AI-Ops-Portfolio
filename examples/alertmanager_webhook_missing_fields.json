@@ -1,0 +1,10 @@
+{
+  "status": "firing",
+  "alerts": [
+    {
+      "labels": {
+        "alertname": "UnknownAlert"
+      }
+    }
+  ]
+}

@@ -229,6 +229,8 @@ python scripts/collect_recent_logs.py \
 
 第三阶段新增 Alertmanager Webhook 接入能力，用于接收 Alertmanager 告警事件，并复用现有规则分析、通义千问 AI 分析和 Markdown 报告生成链路。
 
+当前支持单条告警样例、多条 alerts 合并为一份报告、字段缺省处理；空 `alerts` 会返回错误。
+
 新增接口：
 
 ```text

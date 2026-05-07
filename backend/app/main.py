@@ -2,6 +2,7 @@ import os
 from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 
 from app.schemas.request_schema import AnalyzeRequest, IngestLogRequest
@@ -119,4 +120,10 @@ def logs_ingest(request: IngestLogRequest) -> dict:
 
 @app.post("/alerts/alertmanager")
 def alerts_alertmanager(payload: dict) -> dict:
+    alerts = payload.get("alerts") if isinstance(payload, dict) else None
+    if not alerts:
+        return JSONResponse(
+            status_code=400,
+            content={"error": "no alerts found in alertmanager webhook"},
+        )
     return ingest_alertmanager_webhook(payload)

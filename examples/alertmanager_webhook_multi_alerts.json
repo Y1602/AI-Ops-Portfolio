@@ -1,0 +1,48 @@
+{
+  "receiver": "ai-opslog",
+  "status": "firing",
+  "alerts": [
+    {
+      "status": "firing",
+      "labels": {
+        "alertname": "HighCPUUsage",
+        "instance": "nginx-web-01",
+        "severity": "warning",
+        "job": "node-exporter"
+      },
+      "annotations": {
+        "summary": "High CPU usage detected",
+        "description": "CPU usage is above 90% for 5 minutes"
+      },
+      "startsAt": "2026-05-06T15:40:00Z",
+      "endsAt": "0001-01-01T00:00:00Z",
+      "generatorURL": "http://prometheus.example/graph?g0.expr=node_cpu_seconds_total"
+    },
+    {
+      "status": "firing",
+      "labels": {
+        "alertname": "DiskSpaceLow",
+        "instance": "db-01",
+        "severity": "critical",
+        "job": "node-exporter"
+      },
+      "annotations": {
+        "summary": "Disk space is low",
+        "description": "Root filesystem free space is below 10%"
+      },
+      "startsAt": "2026-05-06T15:45:00Z",
+      "endsAt": "0001-01-01T00:00:00Z",
+      "generatorURL": "http://prometheus.example/graph?g0.expr=node_filesystem_avail_bytes"
+    }
+  ],
+  "groupLabels": {
+    "alertname": "node-exporter-alerts"
+  },
+  "commonLabels": {
+    "job": "node-exporter"
+  },
+  "commonAnnotations": {
+    "summary": "Multiple node exporter alerts"
+  },
+  "externalURL": "http://alertmanager.example"
+}

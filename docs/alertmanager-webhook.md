@@ -13,12 +13,14 @@ AI-OpsLog 第三阶段新增 `POST /alerts/alertmanager`，用于接收 Alertman
 - 当前不配置真实告警规则
 - 当前只提供 Webhook 接收与分析接口
 - 当前一个 Webhook 请求生成一份报告
+- 当前多条 alerts 会合并进一份报告
 - 当前不做告警去重
+- 当前不做告警恢复状态处理
 - 当前不做告警静默
 - 当前不做通知分发
-- 当前不自动执行修复命令
+- 当前不会执行任何系统命令
 
-## 3. 示例请求
+## 3. 单条告警测试
 
 ```bash
 curl -X POST http://127.0.0.1:8000/alerts/alertmanager \
@@ -26,7 +28,7 @@ curl -X POST http://127.0.0.1:8000/alerts/alertmanager \
   -d @examples/alertmanager_webhook_high_cpu.json
 ```
 
-## 4. 示例返回
+示例返回：
 
 ```json
 {
@@ -42,13 +44,55 @@ curl -X POST http://127.0.0.1:8000/alerts/alertmanager \
 }
 ```
 
-## 5. 查看报告
+## 4. 多条告警测试
+
+```bash
+curl -X POST http://127.0.0.1:8000/alerts/alertmanager \
+  -H "Content-Type: application/json" \
+  -d @examples/alertmanager_webhook_multi_alerts.json
+```
+
+预期：
+
+- `alert_count=2`
+- `rule_severity=high`
+- 生成一份 Markdown 报告
+
+## 5. 字段缺失测试
+
+```bash
+curl -X POST http://127.0.0.1:8000/alerts/alertmanager \
+  -H "Content-Type: application/json" \
+  -d @examples/alertmanager_webhook_missing_fields.json
+```
+
+预期：
+
+- 接口不崩溃
+- 缺省字段使用默认值
+- 仍可生成报告
+
+## 6. 空 alerts 测试
+
+```bash
+curl -i -X POST http://127.0.0.1:8000/alerts/alertmanager \
+  -H "Content-Type: application/json" \
+  -d @examples/alertmanager_webhook_empty_alerts.json
+```
+
+预期：
+
+- 返回 400
+- 返回 `no alerts found` 相关错误
+- 不生成报告
+
+## 7. 查看报告
 
 ```bash
 ls -lh reports/
 ```
 
-## 6. 后续方向
+## 8. 后续方向
 
 - 接入真实 Alertmanager
 - 增加更多告警类型规则
