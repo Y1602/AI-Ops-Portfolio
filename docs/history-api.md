@@ -1,18 +1,35 @@
 # AI-OpsLog 历史记录查询接口
 
-第四阶段第二步新增基础历史记录查询接口，用于查询 SQLite 中已经保存的分析元数据。
+第四阶段新增历史记录查询接口，用于查询 SQLite 中已经保存的分析元数据。
 
 ## 接口列表
 
 - `GET /history/recent`：查询最近 10 条分析记录
 - `GET /history/recent?limit=5`：限制返回数量，`limit` 范围为 1 到 100
+- `GET /history/recent?log_type=alertmanager_alert&webhook_status=firing&limit=5`：按条件过滤最近分析记录
 - `GET /history/{id}`：按记录 ID 查询单条分析记录
+
+## 过滤参数
+
+`GET /history/recent` 支持以下过滤参数：
+
+- `log_type`
+- `source`
+- `service_name`
+- `env`
+- `rule_severity`
+- `ai_risk_level`
+- `webhook_status`
+- `limit`
+
+多个过滤条件同时存在时使用 `AND` 关系。当前过滤查询为精确匹配，不支持模糊搜索。
 
 ## 请求示例
 
 ```bash
 curl -s http://127.0.0.1:8000/history/recent | python -m json.tool
 curl -s "http://127.0.0.1:8000/history/recent?limit=1" | python -m json.tool
+curl -s "http://127.0.0.1:8000/history/recent?log_type=alertmanager_alert&webhook_status=firing&limit=5" | python -m json.tool
 curl -s http://127.0.0.1:8000/history/1 | python -m json.tool
 ```
 
@@ -45,5 +62,6 @@ curl -s http://127.0.0.1:8000/history/1 | python -m json.tool
 - 只返回 SQLite 中保存的分析元数据
 - 不返回完整原始日志
 - 不读取 Markdown 报告正文
-- 不支持按 `source`、`log_type` 或风险等级过滤
+- 不支持模糊搜索
+- 不支持时间范围查询
 - 不提供分页系统

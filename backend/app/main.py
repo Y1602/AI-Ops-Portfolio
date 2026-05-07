@@ -134,14 +134,32 @@ def reports_check() -> dict:
 
 
 @app.get("/history/recent")
-def history_recent(limit: int = 10) -> dict:
+def history_recent(
+    limit: int = 10,
+    log_type: str | None = None,
+    source: str | None = None,
+    service_name: str | None = None,
+    env: str | None = None,
+    rule_severity: str | None = None,
+    ai_risk_level: str | None = None,
+    webhook_status: str | None = None,
+) -> dict:
     if limit <= 0:
         raise HTTPException(status_code=400, detail="limit must be greater than 0")
     if limit > 100:
         raise HTTPException(status_code=400, detail="limit must be less than or equal to 100")
 
     try:
-        records = get_recent_analysis_records(limit=limit)
+        records = get_recent_analysis_records(
+            limit=limit,
+            log_type=_normalize_history_filter(log_type),
+            source=_normalize_history_filter(source),
+            service_name=_normalize_history_filter(service_name),
+            env=_normalize_history_filter(env),
+            rule_severity=_normalize_history_filter(rule_severity),
+            ai_risk_level=_normalize_history_filter(ai_risk_level),
+            webhook_status=_normalize_history_filter(webhook_status),
+        )
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"failed to query history records: {exc}") from exc
 
@@ -149,6 +167,13 @@ def history_recent(limit: int = 10) -> dict:
         "records": records,
         "count": len(records),
     }
+
+
+def _normalize_history_filter(value: str | None) -> str | None:
+    if value is None:
+        return None
+    normalized = value.strip()
+    return normalized or None
 
 
 @app.get("/history/{record_id}")

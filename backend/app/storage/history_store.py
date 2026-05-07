@@ -114,9 +114,40 @@ def save_analysis_record(record: dict[str, Any]) -> int:
         return int(cursor.lastrowid)
 
 
-def get_recent_analysis_records(limit: int = 10) -> list[dict[str, Any]]:
+def get_recent_analysis_records(
+    limit: int = 10,
+    log_type: str | None = None,
+    source: str | None = None,
+    service_name: str | None = None,
+    env: str | None = None,
+    rule_severity: str | None = None,
+    ai_risk_level: str | None = None,
+    webhook_status: str | None = None,
+) -> list[dict[str, Any]]:
     normalized_limit = min(max(limit, 1), 100)
     db_path = get_db_path()
+    filters = {
+        "log_type": log_type,
+        "source": source,
+        "service_name": service_name,
+        "env": env,
+        "rule_severity": rule_severity,
+        "ai_risk_level": ai_risk_level,
+        "webhook_status": webhook_status,
+    }
+    where_clauses = []
+    params: list[Any] = []
+
+    for column, value in filters.items():
+        if value:
+            where_clauses.append(f"{column} = ?")
+            params.append(value)
+
+    where_sql = ""
+    if where_clauses:
+        where_sql = "WHERE " + " AND ".join(where_clauses)
+
+    params.append(normalized_limit)
 
     with sqlite3.connect(db_path) as connection:
         connection.row_factory = sqlite3.Row
@@ -125,10 +156,11 @@ def get_recent_analysis_records(limit: int = 10) -> list[dict[str, Any]]:
             SELECT
                 {ANALYSIS_RECORD_COLUMNS}
             FROM analysis_records
+            {where_sql}
             ORDER BY id DESC
             LIMIT ?;
             """,
-            (normalized_limit,),
+            params,
         ).fetchall()
         return [dict(row) for row in rows]
 

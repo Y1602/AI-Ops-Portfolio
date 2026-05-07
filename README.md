@@ -271,6 +271,27 @@ curl -X POST http://127.0.0.1:8000/alerts/alertmanager \
 
 当前查询接口只返回 SQLite 中保存的分析元数据，不返回完整原始日志，也不读取 Markdown 报告正文。详细说明见：[docs/history-api.md](docs/history-api.md)。
 
+### 历史记录过滤查询
+
+`GET /history/recent` 支持以下过滤参数：
+
+- `log_type`
+- `source`
+- `service_name`
+- `env`
+- `rule_severity`
+- `ai_risk_level`
+- `webhook_status`
+- `limit`
+
+示例：
+
+```bash
+curl "http://127.0.0.1:8000/history/recent?log_type=alertmanager_alert&webhook_status=firing&limit=5"
+```
+
+当前过滤查询为精确匹配，不支持模糊搜索。
+
 ## 6. API 接口说明
 
 - `GET /health`: 健康检查
