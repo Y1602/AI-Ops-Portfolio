@@ -225,6 +225,26 @@ python scripts/collect_recent_logs.py \
 - 当前 AI 返回的命令只作为人工排查建议
 - 当前会拦截敏感文件，例如 `.env`、`id_rsa`、`/etc/passwd`、`/etc/shadow`、`*.pem`、`*.key`
 
+## 第三阶段：Alertmanager Webhook 接入
+
+第三阶段新增 Alertmanager Webhook 接入能力，用于接收 Alertmanager 告警事件，并复用现有规则分析、通义千问 AI 分析和 Markdown 报告生成链路。
+
+新增接口：
+
+```text
+POST /alerts/alertmanager
+```
+
+示例命令：
+
+```bash
+curl -X POST http://127.0.0.1:8000/alerts/alertmanager \
+  -H "Content-Type: application/json" \
+  -d @examples/alertmanager_webhook_high_cpu.json
+```
+
+详细说明见：[docs/alertmanager-webhook.md](docs/alertmanager-webhook.md)。
+
 ## 6. API 接口说明
 
 - `GET /health`: 健康检查
@@ -237,6 +257,7 @@ python scripts/collect_recent_logs.py \
 - `POST /analyze/ai/report`: AI Markdown 报告接口
 - `POST /analyze/ai/report/save`: 生成并保存 AI Markdown 报告
 - `POST /logs/ingest`: 当前主要日志接收接口，用于接收外部服务日志并生成分析报告
+- `POST /alerts/alertmanager`: 接收 Alertmanager Webhook 告警事件并生成分析报告
 
 `POST /logs/ingest` 示例：
 

@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 from app.schemas.request_schema import AnalyzeRequest, IngestLogRequest
 from app.services.ai_analysis_service import analyze_log_with_ai
 from app.services.analyze_service import analyze_log
+from app.services.alertmanager_service import ingest_alertmanager_webhook
 from app.services.ingest_service import ingest_log
 from app.services.qwen_client import test_qwen_connection
 from app.services.report_service import (
@@ -114,3 +115,8 @@ def reports_check() -> dict:
 @app.post("/logs/ingest")
 def logs_ingest(request: IngestLogRequest) -> dict:
     return ingest_log(request)
+
+
+@app.post("/alerts/alertmanager")
+def alerts_alertmanager(payload: dict) -> dict:
+    return ingest_alertmanager_webhook(payload)
