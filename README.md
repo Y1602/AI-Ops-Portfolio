@@ -162,9 +162,7 @@ AI-Ops-Portfolio/
 │       ├── storage/
 │       └── parsers/
 ├── scripts/
-│   ├── collect_unified_logs.py
-│   ├── collect_recent_logs.py
-│   └── send_log.py
+│   └── collect_unified_logs.py
 ├── docs/
 │   ├── log_sources.md
 │   ├── stage-6-plan.md
@@ -194,8 +192,6 @@ AI-Ops-Portfolio/
 - [统一日志来源说明](docs/log_sources.md)
 - [第六阶段开发计划](docs/stage-6-plan.md)
 - [历史记录 API](docs/history-api.md)
-- [Alertmanager 接入说明](docs/alertmanager-webhook.md)
-- [Cron 使用说明](docs/cron-guide.md)
 
 ## 安全边界
 

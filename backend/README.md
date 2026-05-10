@@ -1,85 +1,45 @@
 # AI-OpsLog Backend
 
-这是 AI-OpsLog 的 FastAPI 后端 Demo。当前提供日志接收、规则解析、规则 Markdown 报告、通义千问辅助分析、AI Markdown 报告、AI 报告保存和 Qwen 连通性测试能力。
+This directory contains the FastAPI backend for AI-OpsLog.
 
-## 本地启动
+Current backend focus:
+
+- Unified log storage in SQLite.
+- Web dashboard at `GET /dashboard/logs`.
+- Basic dashboard filters for source, host, log level, and time range.
+- On-demand AI analysis for a single stored log via `POST /logs/{id}/analyze`.
+- Compatibility endpoints for historical records and earlier ingest workflows.
+
+## Local Run
 
 ```bash
 pip install -r requirements.txt
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-本地直接运行可以不设置 `REPORTS_DIR`，默认保存到项目根目录 `reports/`。
+## Main Endpoints
 
-## Docker 环境下的报告保存路径
+- `GET /health`
+- `GET /dashboard/logs`
+- `POST /logs/{id}/analyze`
+- `GET /history/recent`
+- `GET /history/{id}`
+- `POST /logs/ingest`
+- `POST /alerts/alertmanager`
+- `GET /qwen/test`
 
-Docker Compose 中使用：
+## Runtime Data
 
-```text
-./reports:/app/reports
-```
-
-容器内报告保存路径：
-
-```text
-/app/reports
-```
-
-宿主机报告保存路径：
+SQLite data is stored through `AI_OPSLOG_DB_PATH`, with the default path:
 
 ```text
-./reports
+data/ai_opslog.db
 ```
 
-Docker Compose 会设置：
+Runtime database files, archived logs, generated logs, and generated reports should not be committed.
 
-```env
-REPORTS_DIR=/app/reports
-```
+## Safety Notes
 
-检查报告目录：
-
-```bash
-curl -s http://127.0.0.1:8000/reports/check | python -m json.tool
-```
-
-查看宿主机报告：
-
-```bash
-ls -lh reports/
-```
-
-查看容器内报告：
-
-```bash
-docker exec -it ai-opslog-backend ls -lh /app/reports
-```
-
-## 接口
-
-- `GET /health`: 健康检查
-- `GET /config/check`: 检查 DashScope 配置是否已加载，不返回 API Key 原文
-- `GET /qwen/test`: 测试通义千问连接
-- `GET /reports/check`: 检查当前报告目录状态
-- `POST /analyze`: 规则解析接口
-- `POST /analyze/report`: 规则解析 Markdown 报告接口
-- `POST /analyze/ai`: 通义千问辅助分析接口
-- `POST /analyze/ai/report`: AI Markdown 报告接口
-- `POST /analyze/ai/report/save`: 生成 AI 日志分析报告，并保存到报告目录
-- `POST /logs/ingest`: 接收外部服务日志，自动完成规则解析、通义千问分析、Markdown 报告生成和保存
-
-## 测试日志接收
-
-```bash
-curl -s -X POST "http://127.0.0.1:8000/logs/ingest" \
-  -H "Content-Type: application/json" \
-  -d @examples/ingest_payload_docker.json \
-  | python -m json.tool
-```
-
-## 安全说明
-
-- 本项目不会自动执行任何系统命令。
-- AI 返回的 `related_commands` 只作为人工排查建议。
-- AI 分析结果不能直接作为生产环境操作依据。
-- `DASHSCOPE_API_KEY` 不应提交到 GitHub，也不会写入 Dockerfile 或镜像。
+- AI output is for manual troubleshooting reference only.
+- The backend does not execute remediation commands returned by AI.
+- API keys must be provided through `.env` or environment variables and must not be committed.

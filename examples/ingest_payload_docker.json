@@ -1,7 +1,0 @@
-{
-  "source": "docker-host-01",
-  "service_name": "redis-container",
-  "env": "dev",
-  "log_type": "docker_log",
-  "log_text": "Error response from daemon: port is already allocated\ncontainer exited with code 1"
-}
