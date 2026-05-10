@@ -172,7 +172,13 @@ def dashboard(
       color: #1f2937;
       font-size: 13px;
     }}
-    .filters button {{
+    .filter-actions {{
+      align-self: end;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }}
+    .filters button, .filters .reset-link {{
       align-self: end;
       height: 35px;
       border: 1px solid #1f2937;
@@ -181,6 +187,17 @@ def dashboard(
       color: #ffffff;
       cursor: pointer;
       font-size: 13px;
+      padding: 0 14px;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      box-sizing: border-box;
+    }}
+    .filters .reset-link {{
+      border-color: #d8dee4;
+      background: #ffffff;
+      color: #1f2937;
     }}
     .filters .wide {{
       grid-column: span 2;
@@ -436,8 +453,11 @@ def dashboard(
       return `
         <h3>日志 #${{escapeHtml(data.log_id)}} AI 分析结果</h3>
         <p><strong>问题摘要：</strong>${{escapeHtml(result.summary || "-")}}</p>
+        <p><strong>关键报错：</strong>${{escapeHtml(result.key_error || "-")}}</p>
         <p><strong>问题原因：</strong>${{escapeHtml(result.root_cause || result.possible_root_cause || "-")}}</p>
         <p><strong>风险等级：</strong>${{escapeHtml(result.risk_level || "-")}}</p>
+        <h4>命中关键词</h4>
+        ${{renderList(result.matched_keywords)}}
         <h4>可能原因</h4>
         ${{renderList(result.possible_causes)}}
         <h4>排查建议</h4>
@@ -536,12 +556,12 @@ def _render_log_filter_form(
         f'<div><label>主机</label><input name="host" value="{_dashboard_value(host)}" placeholder="host / container"></div>'
         f'<div><label>日志等级</label><select name="log_level">{_select_options(level_options, log_level, display_log_level)}</select></div>'
         f'<div><label>最近 N 小时</label><select name="recent_hours">{_select_options(recent_hour_options, str(recent_hours) if recent_hours else None, _display_recent_hours)}</select></div>'
-        f'<div><label>开始时间</label><input name="time_from" value="{_dashboard_value(time_from)}" placeholder="2026-05-10T00:00:00"></div>'
-        f'<div><label>结束时间</label><input name="time_to" value="{_dashboard_value(time_to)}" placeholder="2026-05-10T23:59:59"></div>'
+        f'<div><label>开始时间</label><input type="datetime-local" name="time_from" value="{_dashboard_value(_datetime_local_value(time_from))}"></div>'
+        f'<div><label>结束时间</label><input type="datetime-local" name="time_to" value="{_dashboard_value(_datetime_local_value(time_to))}"></div>'
         f'<div class="wide"><label>消息关键字</label><input name="keyword" value="{_dashboard_value(keyword)}" placeholder="error / timeout / connection refused"></div>'
         f'<div><label>数量</label><input name="limit" value="{_dashboard_value(limit)}"></div>'
         '<input type="hidden" name="page" value="1">'
-        "<button type=\"submit\">筛选日志</button>"
+        '<div class="filter-actions"><button type="submit">筛选日志</button><a class="reset-link" href="/dashboard/logs">重置筛选</a></div>'
         "</form>"
     )
 
@@ -625,6 +645,17 @@ def _display_recent_hours(value: object) -> str:
     if value is None or value == "":
         return "全部"
     return f"最近 {value} 小时"
+
+
+def _datetime_local_value(value: str | None) -> str:
+    normalized = _normalize_history_filter(value)
+    if not normalized:
+        return ""
+    try:
+        parsed = datetime.fromisoformat(normalized.replace("Z", "+00:00"))
+    except ValueError:
+        return normalized[:16]
+    return parsed.strftime("%Y-%m-%dT%H:%M")
 
 
 def _effective_time_from(time_from: str | None, recent_hours: int | None) -> str | None:
