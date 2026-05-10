@@ -1,0 +1,1 @@
+"""Unified log collection adapters."""

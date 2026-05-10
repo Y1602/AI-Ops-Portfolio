@@ -2,13 +2,11 @@
 import argparse
 import os
 import queue
-import re
 import socket
 import sys
 import threading
 import time
 from dataclasses import dataclass
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable
 
@@ -17,37 +15,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 BACKEND_ROOT = PROJECT_ROOT / "backend"
 sys.path.insert(0, str(BACKEND_ROOT))
 
+from app.collectors.log_adapters import SUPPORTED_SOURCES, normalize_log_line  # noqa: E402
 from app.storage.log_store import archive_old_logs, init_logs_db, save_log_records  # noqa: E402
-
-
-SUPPORTED_SOURCES = {
-    "system",
-    "zabbix",
-    "prometheus",
-    "grafana",
-    "ansible",
-    "docker",
-    "kubernetes",
-    "nginx_access",
-    "nginx_error",
-    "redis",
-    "mysql",
-}
-
-LOG_LEVELS = {"FATAL", "ERROR", "WARN", "INFO", "DEBUG"}
-LEVEL_ALIASES = {
-    "fatal": "FATAL",
-    "panic": "FATAL",
-    "critical": "FATAL",
-    "crit": "FATAL",
-    "error": "ERROR",
-    "err": "ERROR",
-    "warning": "WARN",
-    "warn": "WARN",
-    "notice": "INFO",
-    "info": "INFO",
-    "debug": "DEBUG",
-}
 
 
 @dataclass
@@ -129,69 +98,6 @@ def parse_target(raw_target: str, default_host: str) -> LogTarget:
     return LogTarget(source=source, path=Path(path), host=host)
 
 
-def normalize_log_line(line: str, target: LogTarget) -> dict:
-    timestamp = extract_timestamp(line)
-    level = extract_level(line, target.source)
-    return {
-        "timestamp": timestamp,
-        "source": target.source,
-        "host": target.host,
-        "log_level": level,
-        "message": line.rstrip("\n"),
-        "AI_analysis_result": None,
-        "created_at": datetime.now(timezone.utc).isoformat(),
-    }
-
-
-def extract_timestamp(line: str) -> str | None:
-    iso_match = re.search(
-        r"(\d{4}-\d{2}-\d{2}[T ][0-9:.]+(?:Z|[+-]\d{2}:?\d{2})?)",
-        line,
-    )
-    if iso_match:
-        return _normalize_timestamp(iso_match.group(1))
-
-    nginx_match = re.search(r"\[(\d{2}/[A-Za-z]{3}/\d{4}:[0-9:]+ [+-]\d{4})\]", line)
-    if nginx_match:
-        try:
-            parsed = datetime.strptime(nginx_match.group(1), "%d/%b/%Y:%H:%M:%S %z")
-            return parsed.isoformat()
-        except ValueError:
-            return nginx_match.group(1)
-
-    syslog_match = re.match(r"([A-Z][a-z]{2}\s+\d{1,2}\s+[0-9:]{8})", line)
-    if syslog_match:
-        try:
-            parsed = datetime.strptime(
-                f"{datetime.now().year} {syslog_match.group(1)}",
-                "%Y %b %d %H:%M:%S",
-            )
-            return parsed.replace(tzinfo=timezone.utc).isoformat()
-        except ValueError:
-            return syslog_match.group(1)
-
-    return None
-
-
-def extract_level(line: str, source: str) -> str:
-    if source == "nginx_access":
-        status_match = re.search(r'"\s+(\d{3})\s+', line)
-        if status_match:
-            status = int(status_match.group(1))
-            if status >= 500:
-                return "ERROR"
-            if status >= 400:
-                return "WARN"
-            return "INFO"
-
-    for token in re.findall(r"[A-Za-z]+", line):
-        mapped = LEVEL_ALIASES.get(token.lower())
-        if mapped:
-            return mapped
-
-    return "INFO"
-
-
 def read_last_lines(path: Path, line_count: int) -> list[str]:
     if line_count <= 0:
         return []
@@ -208,7 +114,7 @@ def collect_once(targets: Iterable[LogTarget], writer: QueueLogWriter, lines: in
             continue
         for line in read_last_lines(target.path, lines):
             if line.strip():
-                writer.put(normalize_log_line(line, target))
+                writer.put(normalize_log_line(line, target.source, target.host))
                 count += 1
     return count
 
@@ -244,7 +150,7 @@ def collect_tail(
                     file.seek(offset)
                     for line in file:
                         if line.strip():
-                            writer.put(normalize_log_line(line, target))
+                            writer.put(normalize_log_line(line, target.source, target.host))
                     offsets[target.path] = file.tell()
 
         if time.monotonic() - last_archive >= archive_interval:
@@ -254,16 +160,6 @@ def collect_tail(
             last_archive = time.monotonic()
 
         time.sleep(interval)
-
-
-def _normalize_timestamp(value: str) -> str:
-    normalized = value.replace(" ", "T", 1)
-    if normalized.endswith("Z"):
-        normalized = normalized[:-1] + "+00:00"
-    try:
-        return datetime.fromisoformat(normalized).isoformat()
-    except ValueError:
-        return value
 
 
 def parse_args() -> argparse.Namespace:
