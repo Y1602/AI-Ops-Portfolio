@@ -153,10 +153,10 @@ def dashboard(
   <style>
     body {{
       margin: 0;
-      background: #f6f8fa;
+      background: #f3f6fb;
       color: #1f2937;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
-      line-height: 1.5;
+      line-height: 1.55;
     }}
     .page {{
       max-width: 1400px;
@@ -167,8 +167,12 @@ def dashboard(
       display: grid;
       grid-template-columns: 170px 180px 145px 150px 185px 185px minmax(240px, 1fr) 86px auto;
       gap: 12px;
-      margin-top: 12px;
-      margin-bottom: 18px;
+      margin: 18px 0 22px;
+      padding: 16px;
+      border: 1px solid #d8e2ef;
+      border-radius: 12px;
+      background: #ffffff;
+      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
       align-items: end;
     }}
     .filters label {{
@@ -181,12 +185,17 @@ def dashboard(
     .filters input, .filters select {{
       box-sizing: border-box;
       width: 100%;
-      padding: 8px 9px;
+      height: 40px;
+      padding: 8px 10px;
       border: 1px solid #d8dee4;
-      border-radius: 6px;
+      border-radius: 8px;
       background: #ffffff;
       color: #1f2937;
-      font-size: 13px;
+      font-size: 14px;
+    }}
+    .filters input:focus, .filters select:focus {{
+      border-color: #2563eb;
+      outline: 3px solid rgba(37, 99, 235, 0.14);
     }}
     .filter-actions {{
       align-self: end;
@@ -196,14 +205,14 @@ def dashboard(
     }}
     .filters button, .filters .reset-link {{
       align-self: end;
-      height: 38px;
-      border: 1px solid #1f2937;
-      border-radius: 6px;
-      background: #1f2937;
+      min-height: 40px;
+      border: 1px solid #1d4ed8;
+      border-radius: 8px;
+      background: #2563eb;
       color: #ffffff;
       cursor: pointer;
-      font-size: 13px;
-      padding: 0 14px;
+      font-size: 14px;
+      padding: 0 16px;
       text-decoration: none;
       display: inline-flex;
       align-items: center;
@@ -212,7 +221,10 @@ def dashboard(
     }}
     .filters button {{
       font-weight: 700;
-      box-shadow: 0 1px 2px rgba(31, 41, 55, 0.12);
+      box-shadow: 0 8px 18px rgba(37, 99, 235, 0.16);
+    }}
+    .filters button:hover {{
+      background: #1d4ed8;
     }}
     .filters .reset-link {{
       border-color: #d8dee4;
@@ -227,14 +239,19 @@ def dashboard(
       align-items: center;
       justify-content: space-between;
       gap: 12px;
-      margin: 10px 0 12px;
+      margin: 12px 0;
+      padding: 10px 12px;
+      border: 1px solid #d8e2ef;
+      border-radius: 10px;
+      background: #ffffff;
       color: #4b5563;
       font-size: 13px;
     }}
-    .pager-links {{
+    .pager-controls {{
       display: flex;
       gap: 8px;
       flex-wrap: wrap;
+      align-items: center;
     }}
     .pager a, .pager .disabled {{
       display: inline-block;
@@ -249,46 +266,93 @@ def dashboard(
       color: #9ca3af;
       background: #f3f4f6;
     }}
+    .pager form {{
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin: 0;
+    }}
+    .pager input {{
+      width: 58px;
+      height: 30px;
+      border: 1px solid #d8dee4;
+      border-radius: 6px;
+      padding: 0 8px;
+    }}
+    .pager button {{
+      height: 32px;
+      border: 1px solid #d8dee4;
+      border-radius: 6px;
+      background: #ffffff;
+      cursor: pointer;
+    }}
     .stats-toolbar {{
       display: flex;
       justify-content: space-between;
       align-items: center;
       gap: 12px;
-      margin-bottom: 12px;
+      margin-bottom: 16px;
+      padding: 14px 16px;
+      border: 1px solid #d8e2ef;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #eff6ff 0%, #ffffff 72%);
+      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
       color: #4b5563;
-      font-size: 13px;
+      font-size: 14px;
+    }}
+    .stats-summary {{
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: 8px;
+    }}
+    .stats-total {{
+      color: #0f172a;
+      font-size: 24px;
+      font-weight: 800;
+    }}
+    .stats-meta {{
+      color: #64748b;
     }}
     .stats-toolbar select {{
+      height: 36px;
       padding: 6px 9px;
       border: 1px solid #d8dee4;
-      border-radius: 6px;
+      border-radius: 8px;
       background: #ffffff;
       color: #1f2937;
     }}
     .stats-grid {{
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-      gap: 14px;
-      margin-bottom: 18px;
+      grid-template-columns: minmax(360px, 1.15fr) minmax(360px, 0.85fr);
+      gap: 18px;
+      margin-bottom: 22px;
     }}
     .stat-panel {{
       background: #ffffff;
-      border: 1px solid #d8dee4;
-      border-radius: 8px;
-      padding: 14px;
+      border: 1px solid #d8e2ef;
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
+      min-width: 0;
     }}
     .stat-panel h3 {{
-      margin: 0 0 10px;
-      font-size: 15px;
+      margin: 0 0 14px;
+      font-size: 17px;
+      line-height: 1.35;
+    }}
+    .stat-panel-scroll {{
+      overflow-x: auto;
+      padding-bottom: 2px;
     }}
     .bar-row {{
       display: grid;
-      grid-template-columns: 120px minmax(120px, 1fr) 52px;
-      gap: 10px;
+      grid-template-columns: 128px minmax(180px, 1fr) 56px;
+      gap: 12px;
       align-items: center;
-      margin: 8px 0;
-      padding: 4px 6px;
-      border-radius: 6px;
+      margin: 9px 0;
+      padding: 6px 8px;
+      border-radius: 8px;
       font-size: 13px;
       color: #1f2937;
       text-decoration: none;
@@ -297,28 +361,32 @@ def dashboard(
       background: #f8fafc;
     }}
     .bar-track {{
-      height: 10px;
+      position: relative;
+      height: 13px;
       overflow: hidden;
       border-radius: 999px;
-      background: #edf2f7;
+      background: #e9eef6;
     }}
     .bar-fill {{
       height: 100%;
       min-width: 2px;
       border-radius: 999px;
-      background: #2563eb;
+      background: linear-gradient(90deg, rgba(37, 99, 235, 0.72), #2563eb);
     }}
-    .bar-fill.level-critical, .bar-fill.level-error {{
-      background: #dc2626;
+    .bar-fill.level-critical {{
+      background: linear-gradient(90deg, rgba(220, 38, 38, 0.65), #dc2626);
+    }}
+    .bar-fill.level-error {{
+      background: linear-gradient(90deg, rgba(249, 115, 22, 0.68), #f97316);
     }}
     .bar-fill.level-warn {{
-      background: #d97706;
+      background: linear-gradient(90deg, rgba(234, 179, 8, 0.72), #eab308);
     }}
     .bar-fill.level-info {{
-      background: #16a34a;
+      background: linear-gradient(90deg, rgba(22, 163, 74, 0.65), #16a34a);
     }}
     .bar-fill.level-debug {{
-      background: #6b7280;
+      background: linear-gradient(90deg, rgba(107, 114, 128, 0.65), #6b7280);
     }}
     .bar-fill.source-system {{
       background: #64748b;
@@ -351,44 +419,50 @@ def dashboard(
       background: #0d9488;
     }}
     header {{
-      margin-bottom: 24px;
+      margin-bottom: 26px;
     }}
     h1 {{
       margin: 0 0 8px;
-      font-size: 30px;
-      font-weight: 700;
+      font-size: 32px;
+      font-weight: 800;
+      letter-spacing: 0;
+      color: #0f172a;
     }}
     .subtitle {{
       margin: 0;
       color: #4b5563;
       font-size: 15px;
+      line-height: 1.7;
     }}
     section {{
-      margin-top: 24px;
+      margin-top: 28px;
     }}
     h2 {{
-      margin: 0 0 12px;
-      font-size: 20px;
+      margin: 0 0 14px;
+      font-size: 22px;
+      line-height: 1.35;
+      color: #0f172a;
     }}
     .table-wrap {{
       overflow-x: auto;
       background: #ffffff;
-      border: 1px solid #d8dee4;
-      border-radius: 8px;
+      border: 1px solid #d8e2ef;
+      border-radius: 12px;
+      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
     }}
     table {{
       width: 100%;
       border-collapse: collapse;
       table-layout: fixed;
-      min-width: 1120px;
+      min-width: 1180px;
     }}
     th, td {{
-      padding: 9px 10px;
+      padding: 11px 12px;
       border-bottom: 1px solid #e5e7eb;
       text-align: left;
       vertical-align: middle;
-      font-size: 13px;
-      white-space: nowrap;
+      font-size: 14px;
+      line-height: 20px;
     }}
     th {{
       background: #f3f4f6;
@@ -405,10 +479,10 @@ def dashboard(
       width: 150px;
     }}
     .col-source {{
-      width: 132px;
+      width: 136px;
     }}
     .col-host {{
-      width: 150px;
+      width: 152px;
     }}
     .col-level {{
       width: 88px;
@@ -426,10 +500,17 @@ def dashboard(
       max-width: 0;
     }}
     .message-text {{
-      display: block;
+      display: -webkit-box;
       overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+      white-space: normal;
+      overflow-wrap: anywhere;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      cursor: pointer;
+    }}
+    .message-text.expanded {{
+      display: block;
+      -webkit-line-clamp: unset;
     }}
     .message-text mark {{
       padding: 0 2px;
@@ -452,9 +533,9 @@ def dashboard(
     .badge {{
       display: inline-block;
       min-width: 28px;
-      padding: 2px 8px;
+      padding: 3px 9px;
       border-radius: 999px;
-      font-size: 12px;
+      font-size: 13px;
       font-weight: 600;
       text-align: center;
       border: 1px solid #d8dee4;
@@ -465,6 +546,26 @@ def dashboard(
       border-color: #f1b7b7;
       background: #fff5f5;
       color: #991b1b;
+    }}
+    .badge-error {{
+      border-color: #fed7aa;
+      background: #fff7ed;
+      color: #9a3412;
+    }}
+    .badge-warn {{
+      border-color: #fde68a;
+      background: #fefce8;
+      color: #854d0e;
+    }}
+    .badge-info {{
+      border-color: #bbf7d0;
+      background: #f0fdf4;
+      color: #166534;
+    }}
+    .badge-debug {{
+      border-color: #d1d5db;
+      background: #f8fafc;
+      color: #475569;
     }}
     .badge-medium {{
       border-color: #f2d28a;
@@ -507,34 +608,37 @@ def dashboard(
       font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
     }}
     .ai-button {{
-      padding: 5px 8px;
-      border: 1px solid #d8dee4;
-      border-radius: 6px;
-      background: #ffffff;
-      color: #1f2937;
+      padding: 7px 10px;
+      border: 1px solid #1d4ed8;
+      border-radius: 8px;
+      background: #eff6ff;
+      color: #1d4ed8;
       cursor: pointer;
-      font-size: 12px;
+      font-size: 13px;
+      font-weight: 700;
     }}
     .ai-button:hover {{
       border-color: #2563eb;
-      color: #1d4ed8;
-      background: #eff6ff;
+      color: #ffffff;
+      background: #2563eb;
     }}
     .ai-result {{
-      margin-top: 14px;
-      padding: 12px;
+      margin-top: 18px;
+      padding: 0;
       background: #ffffff;
-      border: 1px solid #d8dee4;
-      border-radius: 8px;
-      font-size: 13px;
+      border: 1px solid #d8e2ef;
+      border-radius: 12px;
+      font-size: 14px;
+      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
+      overflow: hidden;
     }}
     .ai-result h3 {{
-      margin: 0 0 10px;
-      font-size: 16px;
+      margin: 0;
+      font-size: 18px;
     }}
     .ai-result h4 {{
-      margin: 12px 0 6px;
-      font-size: 14px;
+      margin: 0 0 8px;
+      font-size: 15px;
     }}
     .ai-result p {{
       margin: 6px 0;
@@ -550,6 +654,87 @@ def dashboard(
       border: 1px solid #d8dee4;
       border-radius: 6px;
       padding: 10px;
+    }}
+    .ai-placeholder {{
+      padding: 16px;
+      color: #64748b;
+    }}
+    .ai-card-header {{
+      display: flex;
+      justify-content: space-between;
+      gap: 14px;
+      align-items: center;
+      padding: 16px;
+      border-bottom: 1px solid #e5e7eb;
+      background: #f8fafc;
+    }}
+    .risk-pill {{
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+      padding: 5px 10px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 800;
+      border: 1px solid #d8dee4;
+    }}
+    .risk-critical, .risk-high {{
+      border-color: #fecaca;
+      background: #fef2f2;
+      color: #991b1b;
+    }}
+    .risk-medium {{
+      border-color: #fde68a;
+      background: #fffbeb;
+      color: #92400e;
+    }}
+    .risk-low {{
+      border-color: #bbf7d0;
+      background: #f0fdf4;
+      color: #166534;
+    }}
+    .risk-unknown {{
+      border-color: #d8dee4;
+      background: #f8fafc;
+      color: #475569;
+    }}
+    .ai-card-body {{
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+      padding: 16px;
+    }}
+    .ai-section {{
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      padding: 13px;
+      background: #ffffff;
+    }}
+    .ai-section.full {{
+      grid-column: 1 / -1;
+      background: #f8fafc;
+    }}
+    .ai-section summary {{
+      cursor: pointer;
+      font-weight: 700;
+      color: #0f172a;
+    }}
+    .ai-section ul {{
+      list-style: none;
+      padding-left: 0;
+    }}
+    .ai-section li {{
+      position: relative;
+      padding-left: 22px;
+      margin: 6px 0;
+    }}
+    .ai-section li::before {{
+      content: "•";
+      position: absolute;
+      left: 7px;
+      color: #2563eb;
+      font-weight: 800;
     }}
     @media (max-width: 1180px) {{
       .filters {{
@@ -590,7 +775,7 @@ def dashboard(
       {pagination}
       {table_body}
       {pagination}
-      <div id="ai-result" class="ai-result">点击“AI 分析”后，分析结果会显示在这里。</div>
+      <div id="ai-result" class="ai-result"><div class="ai-placeholder">点击“AI 分析”后，分析结果会显示在这里。</div></div>
     </section>
 
     <section>
@@ -635,30 +820,61 @@ def dashboard(
       return mapping[raw] || value || "-";
     }}
 
+    function riskClass(value) {{
+      const raw = String(value || "unknown").toLowerCase();
+      if (raw === "critical" || raw === "high") return "risk-high";
+      if (raw === "medium") return "risk-medium";
+      if (raw === "low") return "risk-low";
+      return "risk-unknown";
+    }}
+
     function renderAnalysis(data) {{
       const result = data.analysis_result || {{}};
       if (result.error) {{
-        return "<h3>AI 分析失败</h3><pre>" + escapeHtml(JSON.stringify(result, null, 2)) + "</pre>";
+        return '<div class="ai-card-header"><h3>AI 分析失败</h3><span class="risk-pill risk-high">异常</span></div><div class="ai-card-body"><div class="ai-section full"><pre>' + escapeHtml(JSON.stringify(result, null, 2)) + "</pre></div></div>";
       }}
+      const risk = result.risk_level || "unknown";
       return `
-        <h3>日志 #${{escapeHtml(data.log_id)}} AI 分析结果</h3>
-        <p><strong>问题摘要：</strong>${{escapeHtml(result.summary || "-")}}</p>
-        <p><strong>关键报错：</strong>${{escapeHtml(result.key_error || "-")}}</p>
-        <p><strong>问题原因：</strong>${{escapeHtml(result.root_cause || result.possible_root_cause || "-")}}</p>
-        <p><strong>风险等级：</strong>${{escapeHtml(displayRiskLevel(result.risk_level))}}</p>
-        <h4>命中关键词</h4>
-        ${{renderList(result.matched_keywords)}}
-        <h4>可能原因</h4>
-        ${{renderList(result.possible_causes)}}
-        <h4>排查建议</h4>
-        ${{renderList(result.troubleshooting_steps || result.recommendations)}}
-        <p><strong>补充说明：</strong>${{escapeHtml(result.notes || "-")}}</p>
+        <div class="ai-card-header">
+          <h3>日志 #${{escapeHtml(data.log_id)}} AI 分析结果</h3>
+          <span class="risk-pill ${{riskClass(risk)}}">风险：${{escapeHtml(displayRiskLevel(risk))}}</span>
+        </div>
+        <div class="ai-card-body">
+          <div class="ai-section">
+            <h4>问题摘要</h4>
+            <p>${{escapeHtml(result.summary || "-")}}</p>
+          </div>
+          <div class="ai-section">
+            <h4>关键报错</h4>
+            <p>${{escapeHtml(result.key_error || "-")}}</p>
+          </div>
+          <div class="ai-section full">
+            <h4>问题原因</h4>
+            <p>${{escapeHtml(result.root_cause || result.possible_root_cause || "-")}}</p>
+          </div>
+          <details class="ai-section" open>
+            <summary>命中关键词</summary>
+            ${{renderList(result.matched_keywords)}}
+          </details>
+          <details class="ai-section">
+            <summary>可能原因</summary>
+            ${{renderList(result.possible_causes)}}
+          </details>
+          <details class="ai-section full">
+            <summary>排查建议</summary>
+            ${{renderList(result.troubleshooting_steps || result.recommendations)}}
+          </details>
+          <div class="ai-section full">
+            <h4>补充说明</h4>
+            <p>${{escapeHtml(result.notes || "-")}}</p>
+          </div>
+        </div>
       `;
     }}
 
     async function analyzeLog(logId) {{
       const output = document.getElementById("ai-result");
-      output.textContent = "正在分析日志 #" + logId + "...";
+      output.innerHTML = '<div class="ai-placeholder">正在分析日志 #' + escapeHtml(logId) + '...</div>';
       try {{
         const response = await fetch("/logs/" + logId + "/analyze", {{ method: "POST" }});
         const data = await response.json();
@@ -690,7 +906,7 @@ def _render_dashboard_rows(records: list[dict], keyword: str | None = None) -> s
             f'<td class="col-source">{_dashboard_value(display_source(record.get("source")))}</td>'
             f'<td class="col-host">{_dashboard_value(record.get("host"))}</td>'
             f"<td>{_level_badge(record.get('log_level'))}</td>"
-            f'<td class="message-cell" title="{_dashboard_value(full_message)}"><span class="message-text">{message_html}</span></td>'
+            f'<td class="message-cell" title="{_dashboard_value(full_message)}"><span class="message-text" onclick="this.classList.toggle(\'expanded\')">{message_html}</span></td>'
             f"<td>{_dashboard_value(_ai_status(record.get('AI_analysis_result')))}</td>"
             f'<td><button class="ai-button" onclick="analyzeLog({_dashboard_value(record.get("id"))})">AI 分析</button></td>'
             "</tr>"
@@ -757,7 +973,10 @@ def _render_statistics_panel(
     )
     return f"""
       <div class="stats-toolbar">
-        <span>统计范围：{escape(period_label)}，共 {int(stats.get("total") or 0)} 条日志</span>
+        <div class="stats-summary">
+          <span class="stats-total">{int(stats.get("total") or 0)}</span>
+          <span class="stats-meta">条日志 · {escape(period_label)}</span>
+        </div>
         <form method="get" action="/dashboard/logs">
           {hidden_inputs}
           <label>统计时间段
@@ -775,7 +994,7 @@ def _render_statistics_panel(
         </div>
         <div class="stat-panel">
           <h3>工具类型分布</h3>
-          {source_chart}
+          <div class="stat-panel-scroll">{source_chart}</div>
         </div>
       </div>
     """
@@ -937,9 +1156,42 @@ def _render_log_pagination(
 
     return (
         '<div class="pager">'
-        f'<span>共 {total_count} 条日志，当前第 {current_page}/{total_pages} 页，显示 {start_index}-{end_index}</span>'
-        f'<div class="pager-links">{prev_link}{next_link}</div>'
+        f'<span class="pager-summary">共 {total_count} 条日志，当前第 {current_page}/{total_pages} 页，显示 {start_index}-{end_index}</span>'
+        f'<div class="pager-controls">{prev_link}{next_link}{_render_page_jump_form(current_page, source, host, log_level, time_from, time_to, recent_hours, keyword, limit, stats_hours)}</div>'
         "</div>"
+    )
+
+
+def _render_page_jump_form(
+    current_page: int,
+    source: str | None,
+    host: str | None,
+    log_level: str | None,
+    time_from: str | None,
+    time_to: str | None,
+    recent_hours: int | None,
+    keyword: str | None,
+    limit: int,
+    stats_hours: int,
+) -> str:
+    hidden_inputs = _dashboard_hidden_inputs(
+        source=source,
+        host=host,
+        log_level=log_level,
+        time_from=time_from,
+        time_to=time_to,
+        recent_hours=recent_hours,
+        keyword=keyword,
+        limit=limit,
+        page=None,
+    )
+    return (
+        '<form method="get" action="/dashboard/logs">'
+        f"{hidden_inputs}"
+        f'<input type="hidden" name="stats_hours" value="{_dashboard_value(stats_hours)}">'
+        f'<label>跳页 <input type="number" min="1" name="page" value="{_dashboard_value(current_page)}"></label>'
+        '<button type="submit">跳转</button>'
+        "</form>"
     )
 
 
@@ -980,7 +1232,7 @@ def _dashboard_hidden_inputs(
     recent_hours: int | None,
     keyword: str | None,
     limit: int,
-    page: int,
+    page: int | None,
 ) -> str:
     params = {
         "source": _normalize_history_filter(source),
@@ -991,7 +1243,7 @@ def _dashboard_hidden_inputs(
         "recent_hours": recent_hours if recent_hours and recent_hours > 0 else None,
         "keyword": _normalize_history_filter(keyword),
         "limit": limit,
-        "page": max(page, 1),
+        "page": max(page, 1) if page is not None else None,
     }
     inputs = []
     for key, value in params.items():
@@ -1187,10 +1439,10 @@ def _level_badge(value: object) -> str:
     display_value = display_log_level(raw_value)
     css_key = {
         "FATAL": "critical",
-        "ERROR": "high",
-        "WARN": "medium",
-        "INFO": "low",
-        "DEBUG": "unknown",
+        "ERROR": "error",
+        "WARN": "warn",
+        "INFO": "info",
+        "DEBUG": "debug",
     }.get(raw_value, "unknown")
     return f'<span class="badge badge-{css_key}">{escape(display_value)}</span>'
 
