@@ -33,6 +33,7 @@ from app.storage.log_store import init_logs_db
 from app.storage.log_store import (
     count_logs,
     get_log_record_by_id,
+    get_log_statistics,
     get_recent_logs,
 )
 
@@ -60,22 +61,27 @@ def dashboard(
     log_level: str | None = None,
     time_from: str | None = None,
     time_to: str | None = None,
-    recent_hours: int | None = None,
+    recent_hours: str | None = None,
     keyword: str | None = None,
-    limit: int = 100,
-    page: int = 1,
+    limit: str | None = "100",
+    page: str | None = "1",
+    stats_hours: str | None = "24",
 ) -> HTMLResponse:
     error_message = ""
-    normalized_time_from = _effective_time_from(time_from, recent_hours)
+    normalized_recent_hours = _parse_optional_positive_int(recent_hours)
+    normalized_time_from = _effective_time_from(time_from, normalized_recent_hours)
     normalized_limit = _normalize_dashboard_limit(limit)
-    normalized_page = max(page, 1)
+    normalized_page = max(_parse_optional_positive_int(page, default=1) or 1, 1)
     normalized_source = _normalize_history_filter(source)
     normalized_host = _normalize_history_filter(host)
     normalized_log_level = _normalize_history_filter(log_level)
     normalized_keyword = _normalize_history_filter(keyword)
     normalized_time_to = _normalize_history_filter(time_to)
+    normalized_stats_hours = _normalize_stats_hours(stats_hours)
     total_count = 0
+    stats = {"hours": normalized_stats_hours, "level_counts": {}, "source_counts": {}, "total": 0}
     try:
+        stats = get_log_statistics(normalized_stats_hours)
         total_count = count_logs(
             source=normalized_source,
             host=normalized_host,
@@ -108,9 +114,10 @@ def dashboard(
         log_level,
         time_from,
         time_to,
-        recent_hours,
+        normalized_recent_hours,
         keyword,
         normalized_limit,
+        normalized_stats_hours,
     )
     pagination = _render_log_pagination(
         total_count=total_count,
@@ -121,8 +128,21 @@ def dashboard(
         log_level=log_level,
         time_from=time_from,
         time_to=time_to,
-        recent_hours=recent_hours,
+        recent_hours=normalized_recent_hours,
         keyword=keyword,
+        stats_hours=normalized_stats_hours,
+    )
+    stats_panel = _render_statistics_panel(
+        stats,
+        normalized_stats_hours,
+        source=source,
+        host=host,
+        log_level=log_level,
+        time_from=time_from,
+        time_to=time_to,
+        recent_hours=normalized_recent_hours,
+        keyword=keyword,
+        limit=normalized_limit,
     )
     error_block = ""
     if error_message:
@@ -228,6 +248,70 @@ def dashboard(
     .pager .disabled {{
       color: #9ca3af;
       background: #f3f4f6;
+    }}
+    .stats-toolbar {{
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+      color: #4b5563;
+      font-size: 13px;
+    }}
+    .stats-toolbar select {{
+      padding: 6px 9px;
+      border: 1px solid #d8dee4;
+      border-radius: 6px;
+      background: #ffffff;
+      color: #1f2937;
+    }}
+    .stats-grid {{
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 14px;
+      margin-bottom: 18px;
+    }}
+    .stat-panel {{
+      background: #ffffff;
+      border: 1px solid #d8dee4;
+      border-radius: 8px;
+      padding: 14px;
+    }}
+    .stat-panel h3 {{
+      margin: 0 0 10px;
+      font-size: 15px;
+    }}
+    .bar-row {{
+      display: grid;
+      grid-template-columns: 120px minmax(120px, 1fr) 52px;
+      gap: 10px;
+      align-items: center;
+      margin: 8px 0;
+      font-size: 13px;
+    }}
+    .bar-track {{
+      height: 10px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: #edf2f7;
+    }}
+    .bar-fill {{
+      height: 100%;
+      min-width: 2px;
+      border-radius: 999px;
+      background: #2563eb;
+    }}
+    .bar-fill.level-critical, .bar-fill.level-error {{
+      background: #dc2626;
+    }}
+    .bar-fill.level-warn {{
+      background: #d97706;
+    }}
+    .bar-fill.level-info {{
+      background: #16a34a;
+    }}
+    .bar-fill.level-debug {{
+      background: #6b7280;
     }}
     header {{
       margin-bottom: 24px;
@@ -408,6 +492,7 @@ def dashboard(
     <section>
       <h2>最近日志</h2>
       {error_block}
+      {stats_panel}
       {filter_form}
       {pagination}
       {table_body}
@@ -524,6 +609,100 @@ def _render_dashboard_rows(records: list[dict]) -> str:
     )
 
 
+def _render_statistics_panel(
+    stats: dict,
+    stats_hours: int,
+    source: str | None,
+    host: str | None,
+    log_level: str | None,
+    time_from: str | None,
+    time_to: str | None,
+    recent_hours: int | None,
+    keyword: str | None,
+    limit: int,
+) -> str:
+    period_label = "过去 24 小时" if stats_hours == 24 else "过去 7 天"
+    level_chart = _render_bar_chart(
+        stats.get("level_counts") or {},
+        display_log_level,
+        _level_bar_class,
+    )
+    source_chart = _render_bar_chart(
+        stats.get("source_counts") or {},
+        display_source,
+        lambda _: "source",
+    )
+    hidden_inputs = _dashboard_hidden_inputs(
+        source=source,
+        host=host,
+        log_level=log_level,
+        time_from=time_from,
+        time_to=time_to,
+        recent_hours=recent_hours,
+        keyword=keyword,
+        limit=limit,
+        page=1,
+    )
+    return f"""
+      <div class="stats-toolbar">
+        <span>统计范围：{escape(period_label)}，共 {int(stats.get("total") or 0)} 条日志</span>
+        <form method="get" action="/dashboard/logs">
+          {hidden_inputs}
+          <label>统计时间段
+            <select name="stats_hours" onchange="this.form.submit()">
+              <option value="24"{' selected' if stats_hours == 24 else ''}>过去 24 小时</option>
+              <option value="168"{' selected' if stats_hours == 168 else ''}>过去 7 天</option>
+            </select>
+          </label>
+        </form>
+      </div>
+      <div class="stats-grid">
+        <div class="stat-panel">
+          <h3>日志等级分布</h3>
+          {level_chart}
+        </div>
+        <div class="stat-panel">
+          <h3>工具类型分布</h3>
+          {source_chart}
+        </div>
+      </div>
+    """
+
+
+def _render_bar_chart(counts: dict, label_func, css_class_func) -> str:
+    if not counts:
+        return '<div class="empty">暂无统计数据</div>'
+    max_count = max((int(value or 0) for value in counts.values()), default=0)
+    if max_count <= 0:
+        return '<div class="empty">暂无统计数据</div>'
+
+    rows = []
+    for key, value in counts.items():
+        count = int(value or 0)
+        percent = max(round((count / max_count) * 100), 2) if count else 0
+        rows.append(
+            '<div class="bar-row">'
+            f'<span>{escape(label_func(key))}</span>'
+            '<div class="bar-track">'
+            f'<div class="bar-fill {escape(css_class_func(key))}" style="width: {percent}%"></div>'
+            '</div>'
+            f'<strong>{count}</strong>'
+            '</div>'
+        )
+    return "".join(rows)
+
+
+def _level_bar_class(value: object) -> str:
+    raw_value = "" if value is None else str(value).upper()
+    return {
+        "FATAL": "level-critical",
+        "ERROR": "level-error",
+        "WARN": "level-warn",
+        "INFO": "level-info",
+        "DEBUG": "level-debug",
+    }.get(raw_value, "level-debug")
+
+
 def _render_log_filter_form(
     source: str | None,
     host: str | None,
@@ -533,6 +712,7 @@ def _render_log_filter_form(
     recent_hours: int | None,
     keyword: str | None,
     limit: int,
+    stats_hours: int,
 ) -> str:
     source_options = [
         "",
@@ -561,6 +741,7 @@ def _render_log_filter_form(
         f'<div class="wide"><label>消息关键字</label><input name="keyword" value="{_dashboard_value(keyword)}" placeholder="error / timeout / connection refused"></div>'
         f'<div><label>数量</label><input name="limit" value="{_dashboard_value(limit)}"></div>'
         '<input type="hidden" name="page" value="1">'
+        f'<input type="hidden" name="stats_hours" value="{_dashboard_value(stats_hours)}">'
         '<div class="filter-actions"><button type="submit">筛选日志</button><a class="reset-link" href="/dashboard/logs">重置筛选</a></div>'
         "</form>"
     )
@@ -587,6 +768,7 @@ def _render_log_pagination(
     time_to: str | None,
     recent_hours: int | None,
     keyword: str | None,
+    stats_hours: int,
 ) -> str:
     if total_count <= 0:
         return '<div class="pager"><span>共 0 条日志</span></div>'
@@ -599,9 +781,9 @@ def _render_log_pagination(
     prev_link = '<span class="disabled">上一页</span>'
     next_link = '<span class="disabled">下一页</span>'
     if current_page > 1:
-        prev_link = f'<a href="{_dashboard_page_url(current_page - 1, source, host, log_level, time_from, time_to, recent_hours, keyword, limit)}">上一页</a>'
+        prev_link = f'<a href="{_dashboard_page_url(current_page - 1, source, host, log_level, time_from, time_to, recent_hours, keyword, limit, stats_hours)}">上一页</a>'
     if current_page < total_pages:
-        next_link = f'<a href="{_dashboard_page_url(current_page + 1, source, host, log_level, time_from, time_to, recent_hours, keyword, limit)}">下一页</a>'
+        next_link = f'<a href="{_dashboard_page_url(current_page + 1, source, host, log_level, time_from, time_to, recent_hours, keyword, limit, stats_hours)}">下一页</a>'
 
     return (
         '<div class="pager">'
@@ -621,6 +803,34 @@ def _dashboard_page_url(
     recent_hours: int | None,
     keyword: str | None,
     limit: int,
+    stats_hours: int,
+) -> str:
+    params = {
+        "source": _normalize_history_filter(source),
+        "host": _normalize_history_filter(host),
+        "log_level": _normalize_history_filter(log_level),
+        "time_from": _normalize_history_filter(time_from),
+        "time_to": _normalize_history_filter(time_to),
+        "recent_hours": recent_hours if recent_hours and recent_hours > 0 else None,
+        "keyword": _normalize_history_filter(keyword),
+        "limit": limit,
+        "page": max(page, 1),
+        "stats_hours": stats_hours,
+    }
+    compact_params = {key: value for key, value in params.items() if value not in (None, "")}
+    return "/dashboard/logs?" + urlencode(compact_params)
+
+
+def _dashboard_hidden_inputs(
+    source: str | None,
+    host: str | None,
+    log_level: str | None,
+    time_from: str | None,
+    time_to: str | None,
+    recent_hours: int | None,
+    keyword: str | None,
+    limit: int,
+    page: int,
 ) -> str:
     params = {
         "source": _normalize_history_filter(source),
@@ -633,12 +843,33 @@ def _dashboard_page_url(
         "limit": limit,
         "page": max(page, 1),
     }
-    compact_params = {key: value for key, value in params.items() if value not in (None, "")}
-    return "/dashboard/logs?" + urlencode(compact_params)
+    inputs = []
+    for key, value in params.items():
+        if value not in (None, ""):
+            inputs.append(f'<input type="hidden" name="{escape(key)}" value="{_dashboard_value(value)}">')
+    return "".join(inputs)
 
 
-def _normalize_dashboard_limit(limit: int) -> int:
-    return min(max(limit, 1), 200)
+def _normalize_dashboard_limit(limit: object) -> int:
+    parsed_limit = _parse_optional_positive_int(limit, default=100) or 100
+    return min(max(parsed_limit, 1), 200)
+
+
+def _parse_optional_positive_int(value: object, default: int | None = None) -> int | None:
+    if value is None or value == "":
+        return default
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return default
+    if parsed <= 0:
+        return default
+    return parsed
+
+
+def _normalize_stats_hours(value: object) -> int:
+    parsed_value = _parse_optional_positive_int(value, default=24) or 24
+    return 168 if parsed_value == 168 else 24
 
 
 def _display_recent_hours(value: object) -> str:

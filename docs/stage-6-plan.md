@@ -19,6 +19,7 @@
 - `GET /dashboard/logs` 集中日志看板
 - Web 筛选：工具类型、主机、日志等级、最近 N 小时、时间范围、消息关键字、返回数量、页码
 - Web 分页：使用 `page` 和 `limit` 展示大量日志，默认每页 100 条
+- Web 统计：按日志等级和工具类型展示过去 24 小时或 7 天分布
 - 单条日志按需 AI 分析：`POST /logs/{id}/analyze`
 - AI 分析前会提取关键报错摘要、命中关键词和上下文
 - AI 分析结果在页面详情区展示，不写入 Markdown
@@ -103,6 +104,13 @@ CREATE TABLE IF NOT EXISTS logs (
 - 工具类型中文展示
 - 日志等级中文展示和 badge 展示
 - 长日志内容截断，避免撑开表格
+
+统计模块：
+
+- 日志等级分布：`FATAL`、`ERROR`、`WARN`、`INFO`、`DEBUG`
+- 工具类型分布：系统日志、Zabbix、Prometheus、Grafana、Ansible、Docker、Kubernetes、Nginx、Redis、MySQL
+- 时间范围：过去 24 小时、过去 7 天
+- 展示方式：纯 HTML/CSS 条形图，不引入前端框架
 
 ## 6. 当前边界
 

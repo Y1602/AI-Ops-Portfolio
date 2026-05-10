@@ -210,6 +210,69 @@ def count_logs(
         return int(row[0]) if row else 0
 
 
+def get_log_statistics(hours: int = 24) -> dict[str, Any]:
+    normalized_hours = hours if hours in {24, 168} else 24
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=normalized_hours)
+    cutoff_text = cutoff.isoformat()
+    db_path = get_db_path()
+
+    with sqlite3.connect(db_path) as connection:
+        level_rows = connection.execute(
+            """
+            SELECT log_level, COUNT(*) AS count
+            FROM logs
+            WHERE COALESCE(timestamp, created_at) >= ?
+            GROUP BY log_level;
+            """,
+            (cutoff_text,),
+        ).fetchall()
+        source_rows = connection.execute(
+            """
+            SELECT source, COUNT(*) AS count
+            FROM logs
+            WHERE COALESCE(timestamp, created_at) >= ?
+            GROUP BY source;
+            """,
+            (cutoff_text,),
+        ).fetchall()
+
+    level_counts = {level: 0 for level in ["FATAL", "ERROR", "WARN", "INFO", "DEBUG"]}
+    for level, count in level_rows:
+        if level in level_counts:
+            level_counts[level] = int(count)
+        elif level:
+            level_counts[str(level)] = int(count)
+
+    source_counts = {
+        source: 0
+        for source in [
+            "system",
+            "zabbix",
+            "prometheus",
+            "grafana",
+            "ansible",
+            "docker",
+            "kubernetes",
+            "nginx_access",
+            "nginx_error",
+            "redis",
+            "mysql",
+        ]
+    }
+    for source, count in source_rows:
+        if source in source_counts:
+            source_counts[source] = int(count)
+        elif source:
+            source_counts[str(source)] = int(count)
+
+    return {
+        "hours": normalized_hours,
+        "level_counts": level_counts,
+        "source_counts": source_counts,
+        "total": sum(level_counts.values()),
+    }
+
+
 def get_log_record_by_id(log_id: int) -> dict[str, Any] | None:
     db_path = get_db_path()
 
