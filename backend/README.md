@@ -36,7 +36,7 @@ SQLite data is stored through `AI_OPSLOG_DB_PATH`, with the default path:
 data/ai_opslog.db
 ```
 
-Runtime database files, archived logs, generated logs, and generated reports should not be committed.
+Runtime database files, archived logs, and generated logs should not be committed.
 
 ## Safety Notes
 

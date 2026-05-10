@@ -2,9 +2,9 @@
 
 ## 1. 阶段目标
 
-第六阶段目标是把 AI-OpsLog 整理为“集中日志收集、统一存储、Web 展示筛选、按需 AI 分析”的演示项目。
+第六阶段目标是把 AI-OpsLog 整理为“集中日志收集、统一存储、Web 展示筛选、历史统计、按需 AI 分析”的演示项目。
 
-本阶段不做自动化处置，不做生产级权限系统，不生成新的 Markdown 报告。
+本阶段不做自动化处置，不做生产级权限系统，不生成 Markdown 报告。
 
 ## 2. 已完成模块
 
@@ -12,18 +12,18 @@
 - 多服务日志适配器：`backend/app/collectors/log_adapters.py`
 - 支持 `once` 定时采集和 `tail` 实时跟随
 - 支持多来源日志：系统日志、Zabbix、Prometheus、Grafana、Ansible、Docker、Kubernetes、Nginx、Redis、MySQL
-- 支持日志等级：`FATAL`, `ERROR`, `WARN`, `INFO`, `DEBUG`
+- 支持日志等级：`FATAL`、`ERROR`、`WARN`、`INFO`、`DEBUG`
 - SQLite `logs` 表统一存储
-- 标准字段：`timestamp`, `source`, `host`, `log_level`, `message`, `AI_analysis_result`, `created_at`
+- 标准字段：`timestamp`、`source`、`host`、`log_level`、`message`、`AI_analysis_result`、`created_at`
 - 默认保留最近 7 天日志，超出记录归档到 `data/archives/*.jsonl`
 - `GET /dashboard/logs` 集中日志看板
 - Web 筛选：工具类型、主机、日志等级、最近 N 小时、时间范围、消息关键字、返回数量、页码
-- Web 分页：使用 `page` 和 `limit` 展示大量日志，默认每页 100 条
 - Web 统计：按日志等级和工具类型展示过去 24 小时或 7 天分布
+- Web 可读性优化：默认最近 24 小时、默认 10 条、消息列省略、关键字高亮、高风险行高亮
 - 单条日志按需 AI 分析：`POST /logs/{id}/analyze`
-- AI 分析前会提取关键报错摘要、命中关键词和上下文
-- AI 分析结果在页面详情区展示，不写入 Markdown
-- 历史接口 `/history/recent`, `/history/{id}` 保持兼容
+- AI 分析前提取关键报错摘要、命中关键词和上下文
+- 历史接口 `/history/recent`、`/history/{id}` 保持兼容
+- 自动采集说明文档：`docs/auto-collection.md`
 
 ## 3. 数据表
 
@@ -44,26 +44,11 @@ CREATE TABLE IF NOT EXISTS logs (
 
 `AI_analysis_result` 字段当前保留给后续迭代。当前按需 AI 分析结果只返回给页面展示，不强制写入数据库。
 
-## 4. 多服务日志支持
+## 4. Web 页面
 
-当前适配器支持：
+`GET /dashboard/logs` 默认展示最近 24 小时的 10 条日志。
 
-- Syslog 风格时间解析
-- ISO 时间解析
-- Nginx Access/Error 时间解析
-- Redis 常见时间格式解析
-- Zabbix 常见时间格式解析
-- Docker / Kubernetes JSON 日志字段提取
-- Prometheus / Grafana / Ansible 常见 `level=...`、`ts=...` 风格字段提取
-- HTTP 状态码到日志等级的基础映射
-
-新增服务时优先在 `backend/app/collectors/log_adapters.py` 中增加解析规则，采集脚本保持只负责读取、排队和写入。
-
-## 5. Web 页面
-
-`GET /dashboard/logs` 默认展示最近 100 条日志。
-
-当前支持查询参数：
+支持查询参数：
 
 - `source`
 - `host`
@@ -77,15 +62,21 @@ CREATE TABLE IF NOT EXISTS logs (
 
 多个筛选条件之间使用 AND 关系。`keyword` 会在 `message` 字段中做基础包含匹配。
 
-页面展示字段：
+统计模块：
 
-- 时间
-- 工具类型
-- 主机
-- 日志等级
-- 日志消息摘要
-- AI 分析状态
-- AI 分析按钮
+- 日志等级分布：`FATAL`、`ERROR`、`WARN`、`INFO`、`DEBUG`
+- 工具类型分布：系统日志、Zabbix、Prometheus、Grafana、Ansible、Docker、Kubernetes、Nginx、Redis、MySQL
+- 时间范围：过去 24 小时、过去 7 天
+- 展示方式：纯 HTML/CSS 条形图
+- 交互优化：鼠标悬停显示数量和占比，点击统计项可快速筛选日志列表
+
+展示层优化：
+- 时间统一显示为 `YYYY-MM-DD HH:MM:SS`
+- 日志等级、工具类型、AI 状态中文显示
+- 日志消息列超长时省略，悬停显示完整内容
+- 关键字搜索结果在消息列高亮显示
+- `FATAL` / `ERROR` 日志行红色高亮，`WARN` 日志行橙色高亮
+- 筛选栏包含工具类型、主机、等级、最近 N 小时、时间范围、关键字、数量和操作按钮
 
 按需 AI 分析结果展示：
 
@@ -98,38 +89,38 @@ CREATE TABLE IF NOT EXISTS logs (
 - 排查建议
 - 补充说明
 
-页面可读性优化：
+## 5. 自动采集
 
-- 时间格式化为 `YYYY-MM-DD HH:MM:SS`
-- 工具类型中文展示
-- 日志等级中文展示和 badge 展示
-- 长日志内容截断，避免撑开表格
+Web 服务启动后不会自动采集日志。日志采集由 `scripts/collect_unified_logs.py` 完成。
 
-统计模块：
+推荐方式：
 
-- 日志等级分布：`FATAL`、`ERROR`、`WARN`、`INFO`、`DEBUG`
-- 工具类型分布：系统日志、Zabbix、Prometheus、Grafana、Ansible、Docker、Kubernetes、Nginx、Redis、MySQL
-- 时间范围：过去 24 小时、过去 7 天
-- 展示方式：纯 HTML/CSS 条形图，不引入前端框架
+- cron 定时运行 `--mode once`
+- systemd 常驻运行 `--mode tail`
+
+详细说明见：
+
+```text
+docs/auto-collection.md
+```
 
 ## 6. 当前边界
 
 - 当前使用 SQLite，后续可替换为 PostgreSQL
-- 当前 Web 筛选只覆盖基础字段
-- 当前不做复杂分页
+- 当前 Web 筛选覆盖基础字段
 - 当前不做全文检索
 - 当前不做 AI 自动分析
 - 当前不执行系统命令
 - 当前不做用户系统和权限系统
-- 当前不生成新的 Markdown 报告
+- 当前不生成 Markdown 报告
+- 当前 Web 页面不查询归档文件
 - 当前不是生产级 AIOps 平台
 
 ## 7. 后续可选增强
 
 - 增加统一日志 JSON 查询 API
 - 支持 PostgreSQL 存储
-- 增加更细粒度的归档策略
+- 增加归档文件查询能力
 - 增加 AI 分析结果持久化开关
 - 增加批量日志分析队列
-- 增加截图和演示视频
-- 整理简历项目描述和面试讲解材料
+- 增加更完整的 systemd 部署模板

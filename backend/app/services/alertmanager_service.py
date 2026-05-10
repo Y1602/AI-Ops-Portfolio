@@ -36,7 +36,7 @@ def ingest_alertmanager_webhook(payload: dict) -> dict:
     response["webhook_status"] = payload.get("status", "unknown")
 
     if not response.get("error"):
-        response["message"] = "alertmanager webhook ingested and report generated"
+        response["message"] = "alertmanager webhook ingested and analyzed without markdown report"
         try:
             save_analysis_record(
                 {

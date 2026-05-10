@@ -1,4 +1,5 @@
 import os
+import re
 from datetime import datetime, timedelta, timezone
 from html import escape
 from pathlib import Path
@@ -18,12 +19,6 @@ from app.services.alertmanager_service import (
 from app.services.ingest_service import ingest_log
 from app.services.on_demand_log_ai_service import analyze_unified_log_record
 from app.services.qwen_client import test_qwen_connection
-from app.services.report_service import (
-    check_reports_dir,
-    generate_ai_markdown_report,
-    generate_markdown_report,
-    save_report_to_file,
-)
 from app.storage.history_store import (
     get_analysis_record_by_id,
     get_recent_analysis_records,
@@ -61,9 +56,9 @@ def dashboard(
     log_level: str | None = None,
     time_from: str | None = None,
     time_to: str | None = None,
-    recent_hours: str | None = None,
+    recent_hours: str | None = "24",
     keyword: str | None = None,
-    limit: str | None = "100",
+    limit: str | None = "10",
     page: str | None = "1",
     stats_hours: str | None = "24",
 ) -> HTMLResponse:
@@ -107,7 +102,7 @@ def dashboard(
         records = []
         error_message = f"统一日志查询失败：{exc}"
 
-    table_body = _render_dashboard_rows(records)
+    table_body = _render_dashboard_rows(records, normalized_keyword)
     filter_form = _render_log_filter_form(
         source,
         host,
@@ -170,10 +165,11 @@ def dashboard(
     }}
     .filters {{
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-      gap: 10px;
+      grid-template-columns: 170px 180px 145px 150px 185px 185px minmax(240px, 1fr) 86px auto;
+      gap: 12px;
       margin-top: 12px;
       margin-bottom: 18px;
+      align-items: end;
     }}
     .filters label {{
       display: block;
@@ -200,7 +196,7 @@ def dashboard(
     }}
     .filters button, .filters .reset-link {{
       align-self: end;
-      height: 35px;
+      height: 38px;
       border: 1px solid #1f2937;
       border-radius: 6px;
       background: #1f2937;
@@ -213,6 +209,10 @@ def dashboard(
       align-items: center;
       justify-content: center;
       box-sizing: border-box;
+    }}
+    .filters button {{
+      font-weight: 700;
+      box-shadow: 0 1px 2px rgba(31, 41, 55, 0.12);
     }}
     .filters .reset-link {{
       border-color: #d8dee4;
@@ -287,7 +287,14 @@ def dashboard(
       gap: 10px;
       align-items: center;
       margin: 8px 0;
+      padding: 4px 6px;
+      border-radius: 6px;
       font-size: 13px;
+      color: #1f2937;
+      text-decoration: none;
+    }}
+    .bar-row:hover {{
+      background: #f8fafc;
     }}
     .bar-track {{
       height: 10px;
@@ -312,6 +319,36 @@ def dashboard(
     }}
     .bar-fill.level-debug {{
       background: #6b7280;
+    }}
+    .bar-fill.source-system {{
+      background: #64748b;
+    }}
+    .bar-fill.source-zabbix {{
+      background: #dc2626;
+    }}
+    .bar-fill.source-prometheus {{
+      background: #f97316;
+    }}
+    .bar-fill.source-grafana {{
+      background: #d97706;
+    }}
+    .bar-fill.source-ansible {{
+      background: #2563eb;
+    }}
+    .bar-fill.source-docker {{
+      background: #0891b2;
+    }}
+    .bar-fill.source-kubernetes {{
+      background: #4f46e5;
+    }}
+    .bar-fill.source-nginx {{
+      background: #16a34a;
+    }}
+    .bar-fill.source-redis {{
+      background: #b91c1c;
+    }}
+    .bar-fill.source-mysql {{
+      background: #0d9488;
     }}
     header {{
       margin-bottom: 24px;
@@ -343,16 +380,15 @@ def dashboard(
       width: 100%;
       border-collapse: collapse;
       table-layout: fixed;
-      min-width: 1280px;
+      min-width: 1120px;
     }}
     th, td {{
-      padding: 10px 12px;
+      padding: 9px 10px;
       border-bottom: 1px solid #e5e7eb;
       text-align: left;
-      vertical-align: top;
-      font-size: 14px;
-      word-break: break-word;
-      overflow-wrap: anywhere;
+      vertical-align: middle;
+      font-size: 13px;
+      white-space: nowrap;
     }}
     th {{
       background: #f3f4f6;
@@ -368,20 +404,50 @@ def dashboard(
     .col-time {{
       width: 150px;
     }}
-    .col-env {{
-      width: 78px;
+    .col-source {{
+      width: 132px;
     }}
-    .col-risk {{
+    .col-host {{
+      width: 150px;
+    }}
+    .col-level {{
       width: 88px;
     }}
     .col-status {{
       width: 90px;
     }}
     .col-message {{
-      width: 360px;
+      width: auto;
     }}
     .col-action {{
       width: 108px;
+    }}
+    .message-cell {{
+      max-width: 0;
+    }}
+    .message-text {{
+      display: block;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }}
+    .message-text mark {{
+      padding: 0 2px;
+      border-radius: 3px;
+      background: #fde68a;
+      color: #78350f;
+    }}
+    .row-risk-high td {{
+      background: #fff5f5;
+    }}
+    .row-risk-high td:first-child {{
+      border-left: 4px solid #dc2626;
+    }}
+    .row-risk-medium td {{
+      background: #fffbeb;
+    }}
+    .row-risk-medium td:first-child {{
+      border-left: 4px solid #d97706;
     }}
     .badge {{
       display: inline-block;
@@ -449,6 +515,11 @@ def dashboard(
       cursor: pointer;
       font-size: 12px;
     }}
+    .ai-button:hover {{
+      border-color: #2563eb;
+      color: #1d4ed8;
+      background: #eff6ff;
+    }}
     .ai-result {{
       margin-top: 14px;
       padding: 12px;
@@ -479,6 +550,28 @@ def dashboard(
       border: 1px solid #d8dee4;
       border-radius: 6px;
       padding: 10px;
+    }}
+    @media (max-width: 1180px) {{
+      .filters {{
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      }}
+      .filters .wide {{
+        grid-column: span 2;
+      }}
+    }}
+    @media (max-width: 760px) {{
+      .page {{
+        padding: 22px 12px 32px;
+      }}
+      h1 {{
+        font-size: 24px;
+      }}
+      .filters .wide {{
+        grid-column: span 1;
+      }}
+      .stats-grid {{
+        grid-template-columns: 1fr;
+      }}
     }}
   </style>
 </head>
@@ -530,6 +623,18 @@ def dashboard(
       return "<ul>" + items.map(item => "<li>" + escapeHtml(item) + "</li>").join("") + "</ul>";
     }}
 
+    function displayRiskLevel(value) {{
+      const mapping = {{
+        critical: "严重",
+        high: "高",
+        medium: "中",
+        low: "低",
+        unknown: "未知"
+      }};
+      const raw = String(value || "").toLowerCase();
+      return mapping[raw] || value || "-";
+    }}
+
     function renderAnalysis(data) {{
       const result = data.analysis_result || {{}};
       if (result.error) {{
@@ -540,7 +645,7 @@ def dashboard(
         <p><strong>问题摘要：</strong>${{escapeHtml(result.summary || "-")}}</p>
         <p><strong>关键报错：</strong>${{escapeHtml(result.key_error || "-")}}</p>
         <p><strong>问题原因：</strong>${{escapeHtml(result.root_cause || result.possible_root_cause || "-")}}</p>
-        <p><strong>风险等级：</strong>${{escapeHtml(result.risk_level || "-")}}</p>
+        <p><strong>风险等级：</strong>${{escapeHtml(displayRiskLevel(result.risk_level))}}</p>
         <h4>命中关键词</h4>
         ${{renderList(result.matched_keywords)}}
         <h4>可能原因</h4>
@@ -569,20 +674,23 @@ def dashboard(
     return HTMLResponse(content=html)
 
 
-def _render_dashboard_rows(records: list[dict]) -> str:
+def _render_dashboard_rows(records: list[dict], keyword: str | None = None) -> str:
     if not records:
         return '<div class="empty">暂无日志记录</div>'
 
     rows = []
     for record in records:
+        row_class = _log_row_class(record.get("log_level"))
+        full_message = "" if record.get("message") is None else str(record.get("message"))
+        message_html = _highlight_keyword(full_message, keyword)
         rows.append(
-            "<tr>"
+            f'<tr class="{row_class}">'
             f"<td>{_dashboard_value(record.get('id'))}</td>"
             f"<td>{_dashboard_value(format_datetime_for_display(record.get('timestamp') or record.get('created_at')))}</td>"
-            f"<td>{_dashboard_value(display_source(record.get('source')))}</td>"
-            f"<td>{_dashboard_value(record.get('host'))}</td>"
+            f'<td class="col-source">{_dashboard_value(display_source(record.get("source")))}</td>'
+            f'<td class="col-host">{_dashboard_value(record.get("host"))}</td>'
             f"<td>{_level_badge(record.get('log_level'))}</td>"
-            f"<td>{_dashboard_value(_short_message(record.get('message')))}</td>"
+            f'<td class="message-cell" title="{_dashboard_value(full_message)}"><span class="message-text">{message_html}</span></td>'
             f"<td>{_dashboard_value(_ai_status(record.get('AI_analysis_result')))}</td>"
             f'<td><button class="ai-button" onclick="analyzeLog({_dashboard_value(record.get("id"))})">AI 分析</button></td>'
             "</tr>"
@@ -595,9 +703,9 @@ def _render_dashboard_rows(records: list[dict]) -> str:
         "<tr>"
         '<th class="col-id">ID</th>'
         '<th class="col-time">时间</th>'
-        "<th>工具类型</th>"
-        "<th>主机</th>"
-        '<th class="col-risk">等级</th>'
+        '<th class="col-source">工具类型</th>'
+        '<th class="col-host">主机</th>'
+        '<th class="col-level">等级</th>'
         '<th class="col-message">日志内容</th>'
         '<th class="col-status">AI 结果</th>'
         '<th class="col-action">操作</th>'
@@ -626,11 +734,15 @@ def _render_statistics_panel(
         stats.get("level_counts") or {},
         display_log_level,
         _level_bar_class,
+        filter_name="log_level",
+        stats_hours=stats_hours,
     )
     source_chart = _render_bar_chart(
         stats.get("source_counts") or {},
         display_source,
-        lambda _: "source",
+        _source_bar_class,
+        filter_name="source",
+        stats_hours=stats_hours,
     )
     hidden_inputs = _dashboard_hidden_inputs(
         source=source,
@@ -669,7 +781,13 @@ def _render_statistics_panel(
     """
 
 
-def _render_bar_chart(counts: dict, label_func, css_class_func) -> str:
+def _render_bar_chart(
+    counts: dict,
+    label_func,
+    css_class_func,
+    filter_name: str | None = None,
+    stats_hours: int = 24,
+) -> str:
     if not counts:
         return '<div class="empty">暂无统计数据</div>'
     max_count = max((int(value or 0) for value in counts.values()), default=0)
@@ -677,17 +795,32 @@ def _render_bar_chart(counts: dict, label_func, css_class_func) -> str:
         return '<div class="empty">暂无统计数据</div>'
 
     rows = []
+    total_count = sum(int(value or 0) for value in counts.values()) or 1
     for key, value in counts.items():
         count = int(value or 0)
-        percent = max(round((count / max_count) * 100), 2) if count else 0
+        bar_percent = max(round((count / max_count) * 100), 2) if count else 0
+        total_percent = round((count / total_count) * 100, 1) if count else 0
+        label = label_func(key)
+        title = f"{label}: {count} 条，占比 {total_percent}%"
+        tag = "a" if filter_name else "div"
+        href = ""
+        if filter_name:
+            params = {
+                filter_name: str(key),
+                "recent_hours": stats_hours,
+                "stats_hours": stats_hours,
+                "limit": 10,
+                "page": 1,
+            }
+            href = f' href="/dashboard/logs?{urlencode(params)}"'
         rows.append(
-            '<div class="bar-row">'
-            f'<span>{escape(label_func(key))}</span>'
+            f'<{tag} class="bar-row"{href} title="{escape(title)}">'
+            f'<span>{escape(label)}</span>'
             '<div class="bar-track">'
-            f'<div class="bar-fill {escape(css_class_func(key))}" style="width: {percent}%"></div>'
+            f'<div class="bar-fill {escape(css_class_func(key))}" style="width: {bar_percent}%"></div>'
             '</div>'
             f'<strong>{count}</strong>'
-            '</div>'
+            f'</{tag}>'
         )
     return "".join(rows)
 
@@ -701,6 +834,23 @@ def _level_bar_class(value: object) -> str:
         "INFO": "level-info",
         "DEBUG": "level-debug",
     }.get(raw_value, "level-debug")
+
+
+def _source_bar_class(value: object) -> str:
+    raw_value = "" if value is None else str(value).lower()
+    if raw_value.startswith("nginx"):
+        return "source-nginx"
+    return {
+        "system": "source-system",
+        "zabbix": "source-zabbix",
+        "prometheus": "source-prometheus",
+        "grafana": "source-grafana",
+        "ansible": "source-ansible",
+        "docker": "source-docker",
+        "kubernetes": "source-kubernetes",
+        "redis": "source-redis",
+        "mysql": "source-mysql",
+    }.get(raw_value, "source-system")
 
 
 def _render_log_filter_form(
@@ -851,7 +1001,7 @@ def _dashboard_hidden_inputs(
 
 
 def _normalize_dashboard_limit(limit: object) -> int:
-    parsed_limit = _parse_optional_positive_int(limit, default=100) or 100
+    parsed_limit = _parse_optional_positive_int(limit, default=10) or 10
     return min(max(parsed_limit, 1), 200)
 
 
@@ -902,6 +1052,32 @@ def _dashboard_value(value: object) -> str:
     if value is None:
         return ""
     return escape(str(value))
+
+
+def _log_row_class(value: object) -> str:
+    raw_value = "" if value is None else str(value).upper()
+    if raw_value in {"FATAL", "ERROR"}:
+        return "row-risk-high"
+    if raw_value == "WARN":
+        return "row-risk-medium"
+    return ""
+
+
+def _highlight_keyword(value: object, keyword: str | None) -> str:
+    text = "" if value is None else str(value)
+    normalized_keyword = _normalize_history_filter(keyword)
+    if not normalized_keyword:
+        return escape(text)
+
+    pattern = re.compile(re.escape(normalized_keyword), re.IGNORECASE)
+    parts = []
+    last_index = 0
+    for match in pattern.finditer(text):
+        parts.append(escape(text[last_index : match.start()]))
+        parts.append(f"<mark>{escape(match.group(0))}</mark>")
+        last_index = match.end()
+    parts.append(escape(text[last_index:]))
+    return "".join(parts)
 
 
 def format_datetime_for_display(value: object) -> str:
@@ -1095,9 +1271,9 @@ def record_detail_page(record_id: int) -> HTMLResponse:
     </section>
 
     <section>
-      <h2>报告信息</h2>
+      <h2>分析信息</h2>
       <dl class="detail-grid">
-        {_record_field("报告路径 (report_path)", record.get("report_path"))}
+        {_record_field("兼容字段 report_path", record.get("report_path"))}
         {_record_field("接口消息", record.get("message"))}
       </dl>
     </section>
@@ -1293,58 +1469,9 @@ def analyze(request: AnalyzeRequest) -> dict:
     return analyze_log(request.log_type, request.log_text)
 
 
-@app.post("/analyze/report")
-def analyze_report(request: AnalyzeRequest) -> dict:
-    result = analyze_log(request.log_type, request.log_text)
-    if "error" in result and "log_type" not in result:
-        return result
-
-    return {
-        "log_type": result.get("log_type", request.log_type),
-        "severity": result.get("severity", "unknown"),
-        "markdown_report": generate_markdown_report(result),
-    }
-
-
 @app.post("/analyze/ai")
 def analyze_ai(request: AnalyzeRequest) -> dict:
     return analyze_log_with_ai(request.log_type, request.log_text)
-
-
-@app.post("/analyze/ai/report")
-def analyze_ai_report(request: AnalyzeRequest) -> dict:
-    result = analyze_log_with_ai(request.log_type, request.log_text)
-    rule_result = result.get("rule_result") or {}
-    ai_result = result.get("ai_result") or {}
-
-    return {
-        "log_type": result.get("log_type", request.log_type),
-        "rule_severity": rule_result.get("severity", "unknown"),
-        "ai_risk_level": ai_result.get("risk_level", "unknown"),
-        "markdown_report": generate_ai_markdown_report(result),
-    }
-
-
-@app.post("/analyze/ai/report/save")
-def analyze_ai_report_save(request: AnalyzeRequest) -> dict:
-    result = analyze_log_with_ai(request.log_type, request.log_text)
-    rule_result = result.get("rule_result") or {}
-    ai_result = result.get("ai_result") or {}
-    markdown_report = generate_ai_markdown_report(result)
-    report_path = save_report_to_file(markdown_report, log_type=result.get("log_type", request.log_type))
-
-    response = {
-        "log_type": result.get("log_type", request.log_type),
-        "rule_severity": rule_result.get("severity", "unknown"),
-        "ai_risk_level": ai_result.get("risk_level", "unknown"),
-        "report_path": report_path,
-        "markdown_report": markdown_report,
-    }
-
-    if report_path.startswith("failed to save report:"):
-        response["error"] = "failed to save report"
-
-    return response
 
 
 @app.get("/config/check")
@@ -1365,11 +1492,6 @@ def config_check() -> dict:
 @app.get("/qwen/test")
 def qwen_test() -> dict:
     return test_qwen_connection()
-
-
-@app.get("/reports/check")
-def reports_check() -> dict:
-    return check_reports_dir()
 
 
 @app.get("/history/recent")

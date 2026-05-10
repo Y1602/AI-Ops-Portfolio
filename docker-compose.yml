@@ -8,10 +8,8 @@ services:
       - DASHSCOPE_API_KEY=${DASHSCOPE_API_KEY}
       - DASHSCOPE_BASE_URL=${DASHSCOPE_BASE_URL}
       - QWEN_MODEL=${QWEN_MODEL}
-      - REPORTS_DIR=/app/reports
       - AI_OPSLOG_DB_PATH=${AI_OPSLOG_DB_PATH:-data/ai_opslog.db}
       - ALERTMANAGER_WEBHOOK_TOKEN=${ALERTMANAGER_WEBHOOK_TOKEN:-}
     volumes:
-      - ./reports:/app/reports
       - ./data:/app/data
     restart: unless-stopped

@@ -15,8 +15,6 @@ env/
 !examples/*.log
 logs/*.log
 !logs/README.md
-reports/*.md
-!reports/README.md
 data/*.db
 data/*.sqlite
 data/*.sqlite3
