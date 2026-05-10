@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import argparse
+import glob
+import json
 import os
 import queue
 import socket
@@ -26,6 +28,10 @@ class LogTarget:
     source: str
     path: Path
     host: str
+
+
+def target_state_key(target: LogTarget) -> str:
+    return f"{target.source}|{target.host}|{target.path}"
 
 
 class QueueLogWriter:
@@ -80,6 +86,26 @@ class QueueLogWriter:
             batch.clear()
 
 
+def start_archive_worker(retention_days: int, archive_dir: str) -> threading.Thread:
+    thread = threading.Thread(
+        target=run_archive_once,
+        args=(retention_days, archive_dir),
+        daemon=True,
+    )
+    thread.start()
+    return thread
+
+
+def run_archive_once(retention_days: int, archive_dir: str) -> None:
+    try:
+        archived_count = archive_old_logs(retention_days, archive_dir)
+    except Exception as exc:
+        print(f"[WARN] archive failed: {exc}")
+        return
+    if archived_count:
+        print(f"[INFO] archived {archived_count} old log records")
+
+
 def parse_target(raw_target: str, default_host: str) -> LogTarget:
     parts = {}
     for item in raw_target.split(","):
@@ -100,6 +126,33 @@ def parse_target(raw_target: str, default_host: str) -> LogTarget:
     return LogTarget(source=source, path=Path(path), host=host)
 
 
+def has_glob_pattern(path: Path) -> bool:
+    return any(char in str(path) for char in ["*", "?", "["])
+
+
+def expand_target_paths(target: LogTarget) -> list[LogTarget]:
+    if not has_glob_pattern(target.path):
+        return [target]
+
+    matches = sorted(glob.glob(str(target.path)))
+    if not matches:
+        print(f"[WARN] glob target matched no files: {target.path}")
+        return []
+
+    return [
+        LogTarget(source=target.source, path=Path(match), host=target.host)
+        for match in matches
+        if Path(match).is_file()
+    ]
+
+
+def expand_targets(targets: Iterable[LogTarget]) -> list[LogTarget]:
+    expanded = []
+    for target in targets:
+        expanded.extend(expand_target_paths(target))
+    return expanded
+
+
 def read_last_lines(path: Path, line_count: int) -> list[str]:
     if line_count <= 0:
         return []
@@ -108,16 +161,68 @@ def read_last_lines(path: Path, line_count: int) -> list[str]:
     return lines[-line_count:]
 
 
-def collect_once(targets: Iterable[LogTarget], writer: QueueLogWriter, lines: int) -> int:
+def read_from_offset(path: Path, offset: int) -> tuple[list[str], int]:
+    with path.open("r", encoding="utf-8", errors="replace") as file:
+        file.seek(offset)
+        lines = file.readlines()
+        return lines, file.tell()
+
+
+def load_state(path: Path) -> dict[str, int]:
+    if not path.exists():
+        return {}
+    try:
+        with path.open("r", encoding="utf-8") as file:
+            data = json.load(file)
+    except (OSError, json.JSONDecodeError):
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    state = {}
+    for key, value in data.items():
+        try:
+            state[str(key)] = int(value)
+        except (TypeError, ValueError):
+            continue
+    return state
+
+
+def save_state(path: Path, state: dict[str, int]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8") as file:
+        json.dump(state, file, ensure_ascii=False, indent=2, sort_keys=True)
+
+
+def collect_once(
+    targets: Iterable[LogTarget],
+    writer: QueueLogWriter,
+    lines: int,
+    state: dict[str, int] | None = None,
+) -> int:
     count = 0
-    for target in targets:
+    for target in expand_targets(targets):
         if not target.path.exists():
             print(f"[WARN] log file not found: {target.path}")
             continue
-        for line in read_last_lines(target.path, lines):
+        target_count = 0
+        current_size = target.path.stat().st_size
+        state_key = target_state_key(target)
+        previous_offset = state.get(state_key) if state is not None else None
+
+        if previous_offset is not None and 0 <= previous_offset <= current_size:
+            target_lines, next_offset = read_from_offset(target.path, previous_offset)
+        else:
+            target_lines = read_last_lines(target.path, lines)
+            next_offset = current_size
+
+        for line in target_lines:
             if line.strip():
                 writer.put(normalize_log_line(line, target.source, target.host))
                 count += 1
+                target_count += 1
+        if state is not None:
+            state[state_key] = next_offset
+        print(f"[INFO] target source={target.source} host={target.host} path={target.path} queued={target_count}")
     return count
 
 
@@ -129,8 +234,10 @@ def collect_tail(
     archive_dir: str,
     archive_interval: float,
 ) -> None:
+    targets = expand_targets(targets)
     offsets = {}
     last_archive = time.monotonic()
+    archive_thread: threading.Thread | None = None
     for target in targets:
         if target.path.exists():
             offsets[target.path] = target.path.stat().st_size
@@ -156,9 +263,8 @@ def collect_tail(
                     offsets[target.path] = file.tell()
 
         if time.monotonic() - last_archive >= archive_interval:
-            archived_count = archive_old_logs(retention_days, archive_dir)
-            if archived_count:
-                print(f"[INFO] archived {archived_count} old log records")
+            if archive_thread is None or not archive_thread.is_alive():
+                archive_thread = start_archive_worker(retention_days, archive_dir)
             last_archive = time.monotonic()
 
         time.sleep(interval)
@@ -180,6 +286,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--retention-days", type=int, default=7)
     parser.add_argument("--archive-dir", default="data/archives")
     parser.add_argument("--archive-interval", type=float, default=86400.0, help="Archive check interval in seconds.")
+    parser.add_argument("--state-file", default="data/collect_unified_logs_state.json")
+    parser.add_argument("--no-state", action="store_true", help="Disable offset state in once mode.")
     parser.add_argument("--dry-run", action="store_true")
     return parser.parse_args()
 
@@ -196,15 +304,17 @@ def main() -> int:
 
     os.environ.setdefault("AI_OPSLOG_DB_PATH", "data/ai_opslog.db")
     init_logs_db()
-    archived_count = archive_old_logs(args.retention_days, args.archive_dir)
-    if archived_count:
-        print(f"[INFO] archived {archived_count} old log records")
+    archive_thread = start_archive_worker(args.retention_days, args.archive_dir)
 
     writer = QueueLogWriter(batch_size=args.batch_size, flush_interval=args.flush_interval)
     writer.start()
     try:
         if args.mode == "once":
-            collected = collect_once(targets, writer, args.lines)
+            state_path = Path(args.state_file)
+            state = None if args.no_state else load_state(state_path)
+            collected = collect_once(targets, writer, args.lines, state)
+            if state is not None:
+                save_state(state_path, state)
             print(f"[INFO] queued {collected} log records")
         else:
             print("[INFO] tail mode started; press Ctrl+C to stop")
@@ -220,6 +330,8 @@ def main() -> int:
         print("[INFO] stopping collector")
     finally:
         writer.stop()
+        if args.mode == "once":
+            archive_thread.join(timeout=5)
 
     return 0
 

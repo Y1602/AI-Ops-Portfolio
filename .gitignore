@@ -18,5 +18,6 @@ logs/*.log
 data/*.db
 data/*.sqlite
 data/*.sqlite3
+data/*state*.json
 data/archives/*.jsonl
 !data/README.md

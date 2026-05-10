@@ -165,7 +165,7 @@ def dashboard(
     }}
     .filters {{
       display: grid;
-      grid-template-columns: 170px 180px 145px 150px 185px 185px minmax(240px, 1fr) 86px auto;
+      grid-template-columns: repeat(6, minmax(150px, 1fr));
       gap: 12px;
       margin: 18px 0 22px;
       padding: 16px;
@@ -174,6 +174,10 @@ def dashboard(
       background: #ffffff;
       box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
       align-items: end;
+      overflow: hidden;
+    }}
+    .filters > div {{
+      min-width: 0;
     }}
     .filters label {{
       display: block;
@@ -233,6 +237,18 @@ def dashboard(
     }}
     .filters .wide {{
       grid-column: span 2;
+    }}
+    .filters .filter-limit {{
+      max-width: 120px;
+    }}
+    .filters .filter-actions {{
+      grid-column: span 2;
+      justify-content: flex-end;
+    }}
+    .refresh-note {{
+      margin: -8px 0 14px;
+      color: #64748b;
+      font-size: 12px;
     }}
     .pager {{
       display: flex;
@@ -622,6 +638,12 @@ def dashboard(
       color: #ffffff;
       background: #2563eb;
     }}
+    .ai-button:disabled {{
+      cursor: wait;
+      border-color: #cbd5e1;
+      background: #e5e7eb;
+      color: #64748b;
+    }}
     .ai-result {{
       margin-top: 18px;
       padding: 0;
@@ -738,10 +760,14 @@ def dashboard(
     }}
     @media (max-width: 1180px) {{
       .filters {{
-        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+        grid-template-columns: repeat(3, minmax(160px, 1fr));
       }}
       .filters .wide {{
         grid-column: span 2;
+      }}
+      .filters .filter-actions {{
+        grid-column: span 3;
+        justify-content: flex-start;
       }}
     }}
     @media (max-width: 760px) {{
@@ -753,6 +779,14 @@ def dashboard(
       }}
       .filters .wide {{
         grid-column: span 1;
+      }}
+      .filters {{
+        grid-template-columns: 1fr;
+      }}
+      .filters .filter-limit,
+      .filters .filter-actions {{
+        grid-column: span 1;
+        max-width: none;
       }}
       .stats-grid {{
         grid-template-columns: 1fr;
@@ -772,6 +806,7 @@ def dashboard(
       {error_block}
       {stats_panel}
       {filter_form}
+      <div class="refresh-note">页面每 60 秒自动刷新一次，保留当前筛选条件。</div>
       {pagination}
       {table_body}
       {pagination}
@@ -872,17 +907,42 @@ def dashboard(
       `;
     }}
 
-    async function analyzeLog(logId) {{
+    const activeAnalyses = new Set();
+
+    async function analyzeLog(logId, button) {{
+      if (activeAnalyses.has(logId)) {{
+        return;
+      }}
+      activeAnalyses.add(logId);
+      if (button) {{
+        button.disabled = true;
+        button.textContent = "分析中";
+      }}
       const output = document.getElementById("ai-result");
       output.innerHTML = '<div class="ai-placeholder">正在分析日志 #' + escapeHtml(logId) + '...</div>';
       try {{
         const response = await fetch("/logs/" + logId + "/analyze", {{ method: "POST" }});
+        if (!response.ok) {{
+          throw new Error("HTTP " + response.status);
+        }}
         const data = await response.json();
         output.innerHTML = renderAnalysis(data);
       }} catch (error) {{
         output.textContent = "AI 分析请求失败：" + error;
+      }} finally {{
+        activeAnalyses.delete(logId);
+        if (button) {{
+          button.disabled = false;
+          button.textContent = "AI 分析";
+        }}
       }}
     }}
+
+    setInterval(() => {{
+      if (!document.hidden && activeAnalyses.size === 0) {{
+        window.location.reload();
+      }}
+    }}, 60000);
   </script>
 </body>
 </html>
@@ -908,7 +968,7 @@ def _render_dashboard_rows(records: list[dict], keyword: str | None = None) -> s
             f"<td>{_level_badge(record.get('log_level'))}</td>"
             f'<td class="message-cell" title="{_dashboard_value(full_message)}"><span class="message-text" onclick="this.classList.toggle(\'expanded\')">{message_html}</span></td>'
             f"<td>{_dashboard_value(_ai_status(record.get('AI_analysis_result')))}</td>"
-            f'<td><button class="ai-button" onclick="analyzeLog({_dashboard_value(record.get("id"))})">AI 分析</button></td>'
+            f'<td><button class="ai-button" onclick="analyzeLog({_dashboard_value(record.get("id"))}, this)">AI 分析</button></td>'
             "</tr>"
         )
 
@@ -1107,8 +1167,8 @@ def _render_log_filter_form(
         f'<div><label>最近 N 小时</label><select name="recent_hours">{_select_options(recent_hour_options, str(recent_hours) if recent_hours else None, _display_recent_hours)}</select></div>'
         f'<div><label>开始时间</label><input type="datetime-local" name="time_from" value="{_dashboard_value(_datetime_local_value(time_from))}"></div>'
         f'<div><label>结束时间</label><input type="datetime-local" name="time_to" value="{_dashboard_value(_datetime_local_value(time_to))}"></div>'
-        f'<div class="wide"><label>消息关键字</label><input name="keyword" value="{_dashboard_value(keyword)}" placeholder="error / timeout / connection refused"></div>'
-        f'<div><label>数量</label><input name="limit" value="{_dashboard_value(limit)}"></div>'
+        f'<div class="wide filter-keyword"><label>消息关键字</label><input name="keyword" value="{_dashboard_value(keyword)}" placeholder="error / timeout / refused"></div>'
+        f'<div class="filter-limit"><label>数量</label><input name="limit" value="{_dashboard_value(limit)}"></div>'
         '<input type="hidden" name="page" value="1">'
         f'<input type="hidden" name="stats_hours" value="{_dashboard_value(stats_hours)}">'
         '<div class="filter-actions"><button type="submit">筛选日志</button><a class="reset-link" href="/dashboard/logs">重置筛选</a></div>'
