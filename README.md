@@ -1,62 +1,49 @@
 # AI-OpsLog
 
-## 1. 项目简介
+AI-OpsLog 是一个面向运维 / SRE 场景的 AI 日志分析 Demo 项目。项目支持集中采集多来源日志，统一写入 SQLite，提供 Web 页面筛选最近日志，并支持对单条日志按需调用通义千问进行原因分析和排查建议生成。
 
-AI-OpsLog 是一个面向运维/SRE 场景的 AI 日志分析助手。它支持通过 HTTP 接口接收 Docker、Nginx 等服务日志，结合规则解析与通义千问大模型生成故障摘要、风险等级、可能原因、排查步骤、修复建议，并保存 Markdown 故障分析报告。
+当前项目定位为学习和展示项目，不是生产级 AIOps 平台。
 
-当前项目定位为 Demo / 学习项目，用于展示 AI 辅助运维日志分析的最小可运行闭环。
+## 功能概览
 
-## 2. 当前阶段能力
+- 统一日志采集：支持定时读取和 tail 实时跟随。
+- 多来源日志：系统日志、Zabbix、Prometheus、Grafana、Ansible、Docker、Kubernetes、Nginx、Redis、MySQL。
+- 标准化字段：`timestamp`、`source`、`host`、`log_level`、`message`、`AI_analysis_result`、`created_at`。
+- 日志等级：`FATAL`、`ERROR`、`WARN`、`INFO`、`DEBUG`。
+- 数据存储：SQLite，默认路径 `data/ai_opslog.db`。
+- 数据保留：默认保留最近 7 天，超出记录归档到 `data/archives/*.jsonl`。
+- Web 看板：`GET /dashboard/logs` 展示最近 100 条日志，并支持基础筛选。
+- 按需 AI 分析：点击单条日志的 AI 分析按钮，页面展示原因和排查建议。
+- 历史接口保留：`/history/recent`、`/history/{id}` 保持兼容。
 
-- 支持 Docker 日志分析
-- 支持 Nginx Error 日志分析
-- 支持 Nginx Access 日志基础分析
-- 支持规则解析
-- 支持通义千问 AI 辅助分析
-- 支持 Markdown 报告生成
-- 支持报告保存到 `reports/`
-- 支持 SQLite 历史记录存储
-- 支持 Docker Compose 部署
-- 支持 `scripts/send_log.py` 模拟外部日志发送
+## 页面预览
 
-## 3. 项目架构
+集中日志看板：
 
-```text
-External Service Logs
-    ↓
-scripts/send_log.py / HTTP POST
-    ↓
-POST /logs/ingest
-    ↓
-Rule Parser
-    ↓
-Qwen AI Analysis
-    ↓
-Markdown Report
-    ↓
-reports/
-```
+![AI-OpsLog dashboard](docs/assets/screenshots/dashboard.png)
 
-## 4. 技术栈
+单条历史记录详情：
+
+![AI-OpsLog record detail](docs/assets/screenshots/record-detail.png)
+
+## 技术栈
 
 - Python
 - FastAPI
+- SQLite
 - Docker / Docker Compose
 - 阿里云百炼 / 通义千问 Qwen
-- Markdown Report
-- Shell / curl 测试
+- 标准库 `sqlite3`
 
-## 5. 快速开始
+## 快速开始
 
-1. 克隆项目并进入目录。
-
-2. 配置环境变量：
+复制环境变量示例：
 
 ```bash
 cp .env.example .env
 ```
 
-编辑 `.env`，填入自己的通义千问 API Key：
+编辑 `.env`：
 
 ```env
 DASHSCOPE_API_KEY=your_dashscope_api_key_here
@@ -66,304 +53,153 @@ REPORTS_DIR=/app/reports
 AI_OPSLOG_DB_PATH=data/ai_opslog.db
 ```
 
-3. 使用 Docker Compose 启动：
+启动服务：
 
 ```bash
 docker compose up -d --build
 ```
 
-4. 健康检查：
+健康检查：
 
 ```bash
-curl -s http://127.0.0.1:8000/health | python -m json.tool
+curl http://127.0.0.1:8000/health
 ```
 
-5. Qwen 连通性测试：
-
-```bash
-curl -s http://127.0.0.1:8000/qwen/test | python -m json.tool
-```
-
-6. 安装客户端依赖并发送测试日志：
-
-```bash
-pip install -r requirements-client.txt
-python scripts/send_log.py \
-  --server http://127.0.0.1:8000 \
-  --source docker-host-01 \
-  --service-name redis-container \
-  --env dev \
-  --log-type docker_log \
-  --file examples/docker_port_conflict.log
-```
-
-7. 查看生成报告：
-
-```bash
-ls -lh reports/
-```
-
-## 第二阶段：最近日志采集脚本
-
-AI-OpsLog 第二阶段新增了 `scripts/collect_recent_logs.py`，用于读取指定日志文件最后 N 行内容，并发送到已有的 `POST /logs/ingest` 接口。后端收到日志后，会继续完成规则分析、通义千问 AI 分析，并生成 Markdown 故障分析报告。
-
-使用示例：
-
-```bash
-python scripts/collect_recent_logs.py \
-  --server http://127.0.0.1:8000 \
-  --source nginx-web-01 \
-  --service-name nginx \
-  --env dev \
-  --log-type nginx_error \
-  --file examples/nginx_error_502.log \
-  --lines 50
-```
-
-执行成功后，控制台会返回 `/logs/ingest` 接口响应结果，并在 `reports/` 目录下生成新的 Markdown 故障分析报告。
-
-如果需要使用 cron 定时执行最近日志采集脚本，可以参考：[docs/cron-guide.md](docs/cron-guide.md)。
-
-### dry-run 预览模式
-
-`--dry-run` 是预览模式，用于在真正发送日志到 `/logs/ingest` 之前，先确认脚本读取到的日志内容是否正确。
-
-dry-run 模式下：
-
-- 会解析参数
-- 会检查日志文件路径
-- 会执行敏感文件拦截
-- 会读取指定日志文件最后 N 行
-- 会在终端打印读取到的日志内容
-- 不会请求 `/logs/ingest`
-- 不会触发 AI 分析
-- 不会生成 `reports/` 报告
-
-示例命令：
-
-```bash
-python scripts/collect_recent_logs.py \
-  --server http://127.0.0.1:8000 \
-  --source nginx-web-01 \
-  --service-name nginx \
-  --env dev \
-  --log-type nginx_error \
-  --file examples/nginx_error_502.log \
-  --lines 10 \
-  --dry-run
-```
-
-示例输出：
+访问 Web 看板：
 
 ```text
-[DRY-RUN] Read last 10 lines from examples/nginx_error_502.log
-[DRY-RUN] The following log content will not be sent to server:
-...
+http://127.0.0.1:8000/dashboard/logs
 ```
 
-### output-log 运行日志
+## 日志采集
 
-`--output-log` 用于记录 `collect_recent_logs.py` 每次运行结果，适合配合 cron 查看采集任务是否执行成功。
-
-需要区分：
-
-- `reports/` 是 AI 分析生成的 Markdown 故障报告目录
-- `logs/` 是采集脚本自身的运行日志目录
-- 两者不要混淆
-
-示例命令：
+定时采集示例：
 
 ```bash
-python scripts/collect_recent_logs.py \
-  --server http://127.0.0.1:8000 \
-  --source nginx-web-01 \
-  --service-name nginx \
-  --env dev \
-  --log-type nginx_error \
-  --file examples/nginx_error_502.log \
-  --lines 50 \
-  --output-log logs/collect_recent_logs.log
+python scripts/collect_unified_logs.py \
+  --mode once \
+  --lines 200 \
+  --target source=nginx_error,path=/var/log/nginx/error.log,host=nginx-web-01
 ```
 
-示例运行日志：
-
-```text
-[2026-05-06 23:21:14] status=success source=nginx-web-01 service=nginx env=dev log_type=nginx_error file=examples/nginx_error_502.log lines=50 max_chars=20000 dry_run=false truncated=false report_path=app/reports/ai_opslog_nginx_error_nginx-web-01_nginx_report_xxx.md
-```
-
-### max-chars 内容长度限制
-
-`--max-chars` 用于限制最终发送给后端或 dry-run 展示的日志内容长度，默认值为 `20000`。
-
-如果日志内容超过 `max_chars`，脚本会保留最后 `max_chars` 个字符，并在日志内容前添加 `[TRUNCATED]` 提示。
-
-保留末尾内容是因为日志排障通常更关注最近发生的错误，最新日志一般位于文件末尾。
-
-示例命令：
+实时跟随示例：
 
 ```bash
-python scripts/collect_recent_logs.py \
-  --server http://127.0.0.1:8000 \
-  --source nginx-web-01 \
-  --service-name nginx \
-  --env dev \
-  --log-type nginx_error \
-  --file examples/nginx_error_502.log \
-  --lines 50 \
-  --max-chars 5000 \
-  --output-log logs/collect_recent_logs.log
+python scripts/collect_unified_logs.py \
+  --mode tail \
+  --interval 1 \
+  --target source=docker,path=/var/log/docker.log,host=docker-host-01
 ```
 
-当前能力边界：
-
-- 当前只支持手动执行一次采集
-- 当前不是实时日志采集器
-- 当前不做 tail -f
-- 当前不做定时任务
-- 当前不做断点续读
-- 当前不做日志去重
-- 当前不做多文件批量采集
-- 当前不执行任何系统命令
-- 当前 AI 返回的命令只作为人工排查建议
-- 当前会拦截敏感文件，例如 `.env`、`id_rsa`、`/etc/passwd`、`/etc/shadow`、`*.pem`、`*.key`
-
-## 第三阶段：Alertmanager Webhook 接入
-
-第三阶段新增 Alertmanager Webhook 接入能力，用于接收 Alertmanager 告警事件，并复用现有规则分析、通义千问 AI 分析和 Markdown 报告生成链路。
-
-当前支持单条告警样例、多条 alerts 合并为一份报告、字段缺省处理；空 `alerts` 会返回错误。
-
-当前支持 firing 和 resolved 告警事件的基础识别，resolved 事件会生成恢复告警分析报告，但不做告警生命周期追踪。
-
-`alertmanager_alert` 会生成偏向监控告警排查的 Markdown 报告。
-
-Alertmanager Webhook 支持可选 Token 校验，只保护 `POST /alerts/alertmanager`，不影响 `/logs/ingest`，详细说明见接入文档。
-
-新增接口：
-
-```text
-POST /alerts/alertmanager
-```
-
-示例命令：
+多来源采集示例：
 
 ```bash
-curl -X POST http://127.0.0.1:8000/alerts/alertmanager \
-  -H "Content-Type: application/json" \
-  -d @examples/alertmanager_webhook_high_cpu.json
+python scripts/collect_unified_logs.py \
+  --mode once \
+  --target source=system,path=/var/log/syslog,host=ops-host-01 \
+  --target source=redis,path=/var/log/redis/redis-server.log,host=redis-01
 ```
 
-详细说明见：[docs/alertmanager-webhook.md](docs/alertmanager-webhook.md)、[docs/alertmanager-config-example.md](docs/alertmanager-config-example.md)、[docs/stage-3-plan.md](docs/stage-3-plan.md) 和 [docs/stage-3-summary.md](docs/stage-3-summary.md)。
+更多日志来源说明见 [docs/log_sources.md](docs/log_sources.md)。
 
-## 第四阶段：SQLite 历史记录存储
+## Web 展示与筛选
 
-第四阶段新增 SQLite 历史记录存储能力。成功的 `/logs/ingest` 日志分析和 `/alerts/alertmanager` 告警分析会将关键元数据写入 `analysis_records` 表，便于后续增加查询接口和简单展示。
+`GET /dashboard/logs` 默认展示最近 100 条日志，支持以下筛选：
 
-默认数据库路径为 `data/ai_opslog.db`。阶段计划见：[docs/stage-4-plan.md](docs/stage-4-plan.md)，阶段总结见：[docs/stage-4-summary.md](docs/stage-4-summary.md)。
-
-### 历史记录查询
-
-第四阶段第二步新增基础历史记录查询接口：
-
-- `GET /history/recent`：查询最近分析记录
-- `GET /history/recent?limit=5`：限制返回数量，`limit` 范围为 1 到 100
-- `GET /history/{id}`：查询单条分析记录
-
-当前查询接口只返回 SQLite 中保存的分析元数据，不返回完整原始日志，也不读取 Markdown 报告正文。详细说明见：[docs/history-api.md](docs/history-api.md)。
-
-### 历史记录过滤查询
-
-`GET /history/recent` 支持以下过滤参数：
-
-- `log_type`
-- `source`
-- `service_name`
-- `env`
-- `rule_severity`
-- `ai_risk_level`
-- `webhook_status`
-- `limit`
+- 工具类型：`source`
+- 主机：`host`
+- 日志等级：`log_level`
+- 最近 N 小时：`recent_hours`
+- 时间范围：`time_from`、`time_to`
+- 返回数量：`limit`
 
 示例：
 
 ```bash
-curl "http://127.0.0.1:8000/history/recent?log_type=alertmanager_alert&webhook_status=firing&limit=5"
+curl "http://127.0.0.1:8000/dashboard/logs?source=docker&log_level=ERROR&recent_hours=24&limit=100"
 ```
 
-当前过滤查询为精确匹配，不支持模糊搜索。
+页面展示层会做可读性优化：时间格式化、日志来源中文化、日志等级中文化、长日志内容截断展示。
 
-## 第五阶段：展示与最终收尾
+## 按需 AI 分析
 
-第五阶段新增一个最小 Web 展示入口，用于展示最近的日志分析和告警分析历史记录。
-
-当前页面：
-
-- `GET /`：展示最近分析记录
-- `GET /records/{id}`：展示单条历史记录详情
-- `GET /history/recent`：查询最近历史记录
-- `GET /history/{id}`：查询单条历史记录
-
-详情页只展示 SQLite 中保存的分析元数据，不读取 Markdown 报告正文。Web 展示页已做基础可读性优化：时间格式更易读，首页不直接展示长报告路径，日志类型、风险等级和告警状态使用中文展示，详情页保留完整元数据。当前展示页面只用于 Demo 和项目展示，不是完整前端系统。阶段计划见：[docs/stage-5-plan.md](docs/stage-5-plan.md)。
-
-## 6. API 接口说明
-
-- `GET /health`: 健康检查
-- `GET /`: 最小 Web 展示页面
-- `GET /records/{id}`: 单条历史记录详情页面
-- `GET /config/check`: 检查 DashScope 配置是否已加载，不返回 API Key 原文
-- `GET /qwen/test`: 测试通义千问连接
-- `GET /reports/check`: 检查报告目录状态
-- `GET /history/recent`: 查询最近分析记录
-- `GET /history/{id}`: 查询单条分析记录
-- `POST /analyze`: 规则解析接口
-- `POST /analyze/report`: 规则 Markdown 报告接口
-- `POST /analyze/ai`: 通义千问辅助分析接口
-- `POST /analyze/ai/report`: AI Markdown 报告接口
-- `POST /analyze/ai/report/save`: 生成并保存 AI Markdown 报告
-- `POST /logs/ingest`: 当前主要日志接收接口，用于接收外部服务日志并生成分析报告
-- `POST /alerts/alertmanager`: 接收 Alertmanager Webhook 告警事件并生成分析报告
-
-`POST /logs/ingest` 示例：
-
-```bash
-curl -s -X POST "http://127.0.0.1:8000/logs/ingest" \
-  -H "Content-Type: application/json" \
-  -d @examples/ingest_payload_docker.json \
-  | python -m json.tool
-```
-
-## 7. 示例报告
-
-`reports/` 目录用于保存运行时生成的 Markdown 报告。自动生成的 `reports/*.md` 默认不提交到 GitHub。
-
-示例报告可查看：
-
-- [Docker 端口冲突分析报告](docs/sample-reports/docker_port_conflict_report.md)
-
-报告片段示例：
+Web 页面每条日志都有 `AI 分析` 按钮。点击后会调用：
 
 ```text
-- 日志类型：docker_log
-- 规则风险等级：high
-- AI 风险等级：high
-- AI 故障摘要：Docker 容器启动失败，端口已被占用。
-- 建议排查命令：ss -lntp, docker ps -a
+POST /logs/{id}/analyze
 ```
 
-## 8. 安全边界
+分析结果在页面详情区显示，包括：
 
-- 本系统不会自动执行任何系统命令。
-- AI 输出的命令只作为人工排查参考。
-- AI 分析结果不能直接作为生产环境操作依据。
-- API Key 通过环境变量或 `.env` 注入，不应提交到 GitHub。
-- 当前项目定位为 Demo / 学习项目，不是完整 AIOps 系统。
+- 问题摘要
+- 问题原因
+- 风险等级
+- 可能原因
+- 排查建议
+- 补充说明
 
-## 9. 后续规划
+当前按需 AI 分析不会生成 Markdown 报告，不会自动执行系统命令，也不会修改历史接口。
 
-- 增加 Redis / Linux 系统日志解析
-- 增加定时日志采集
-- 增加 `tail -f` 增量采集
-- 接入 Prometheus Alertmanager Webhook
-- 增加简单 Web 页面
-- 增加历史记录数据库
-- 增加更多故障案例样例
+## 保留接口
+
+- `GET /health`
+- `GET /dashboard/logs`
+- `POST /logs/{id}/analyze`
+- `GET /history/recent`
+- `GET /history/{id}`
+- `POST /logs/ingest`
+- `POST /alerts/alertmanager`
+- `GET /qwen/test`
+
+## 项目结构
+
+```text
+AI-Ops-Portfolio/
+├── backend/
+│   └── app/
+│       ├── main.py
+│       ├── services/
+│       ├── storage/
+│       └── parsers/
+├── scripts/
+│   ├── collect_unified_logs.py
+│   ├── collect_recent_logs.py
+│   └── send_log.py
+├── docs/
+│   ├── log_sources.md
+│   ├── stage-6-plan.md
+│   └── assets/screenshots/
+├── examples/
+├── data/
+├── logs/
+├── reports/
+├── docker-compose.yml
+└── README.md
+```
+
+## 运行时文件
+
+以下文件属于运行时产物，不应提交到 Git：
+
+- `.env`
+- `data/*.db`
+- `data/*.sqlite`
+- `data/*.sqlite3`
+- `data/archives/*.jsonl`
+- `logs/*.log`
+- `reports/*.md`
+
+## 文档
+
+- [统一日志来源说明](docs/log_sources.md)
+- [第六阶段开发计划](docs/stage-6-plan.md)
+- [历史记录 API](docs/history-api.md)
+- [Alertmanager 接入说明](docs/alertmanager-webhook.md)
+- [Cron 使用说明](docs/cron-guide.md)
+
+## 安全边界
+
+- AI 输出只作为人工排查参考。
+- 系统不会自动执行 AI 返回的建议。
+- API Key 通过 `.env` 或环境变量注入，不应提交。
+- 当前项目用于 Demo / 学习 / 简历展示，不是生产级平台。

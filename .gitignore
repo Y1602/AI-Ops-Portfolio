@@ -20,4 +20,5 @@ reports/*.md
 data/*.db
 data/*.sqlite
 data/*.sqlite3
+data/archives/*.jsonl
 !data/README.md
