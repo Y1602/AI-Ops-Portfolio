@@ -6,6 +6,12 @@
 
 本阶段不做自动化处置，不做生产级权限系统，不生成 Markdown 报告。
 
+当前第六阶段已完成，项目进入 GitHub 展示和简历整理阶段。最终总结见：
+
+```text
+docs/project-final-summary.md
+```
+
 ## 2. 已完成模块
 
 - 统一日志采集脚本：`scripts/collect_unified_logs.py`

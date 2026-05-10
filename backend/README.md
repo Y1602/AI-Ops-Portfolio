@@ -1,23 +1,23 @@
-# AI-OpsLog Backend
+# AI-OpsLog 后端说明
 
-This directory contains the FastAPI backend for AI-OpsLog.
+本目录是 AI-OpsLog 的 FastAPI 后端服务代码。
 
-Current backend focus:
+当前后端主要负责：
 
-- Unified log storage in SQLite.
-- Web dashboard at `GET /dashboard/logs`.
-- Basic dashboard filters for source, host, log level, and time range.
-- On-demand AI analysis for a single stored log via `POST /logs/{id}/analyze`.
-- Compatibility endpoints for historical records and earlier ingest workflows.
+- 使用 SQLite 统一存储采集后的日志数据。
+- 提供 Web 看板：`GET /dashboard/logs`。
+- 支持按工具类型、主机、日志等级、时间范围和关键字筛选日志。
+- 支持单条日志按需 AI 分析：`POST /logs/{id}/analyze`。
+- 保留历史记录接口和早期日志/告警接入接口，保证兼容性。
 
-## Local Run
+## 本地运行
 
 ```bash
 pip install -r requirements.txt
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-## Main Endpoints
+## 主要接口
 
 - `GET /health`
 - `GET /dashboard/logs`
@@ -28,18 +28,18 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 - `POST /alerts/alertmanager`
 - `GET /qwen/test`
 
-## Runtime Data
+## 运行时数据
 
-SQLite data is stored through `AI_OPSLOG_DB_PATH`, with the default path:
+SQLite 数据库路径通过 `AI_OPSLOG_DB_PATH` 配置，默认路径为：
 
 ```text
 data/ai_opslog.db
 ```
 
-Runtime database files, archived logs, and generated logs should not be committed.
+运行时数据库文件、归档日志和采集日志不应提交到 Git。
 
-## Safety Notes
+## 安全说明
 
-- AI output is for manual troubleshooting reference only.
-- The backend does not execute remediation commands returned by AI.
-- API keys must be provided through `.env` or environment variables and must not be committed.
+- AI 输出只作为人工排查参考。
+- 后端不会执行 AI 返回的修复命令。
+- API Key 应通过 `.env` 或环境变量提供，不应提交到仓库。

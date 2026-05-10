@@ -4,6 +4,23 @@ AI-OpsLog 是一个基于OpenAI codex开发的面向运维场景的 AI 日志分
 
 当前项目用于个人学习、演示和使用，不是生产级 AIOps 平台。
 
+## 项目逻辑
+
+AI-OpsLog 的最终主链路是：
+
+```text
+服务日志文件 -> 采集脚本 -> 字段标准化 -> SQLite logs 表 -> Web 看板筛选/统计 -> 单条日志按需 AI 分析
+```
+
+关键设计：
+
+- Web 服务负责展示、筛选、统计和按需 AI 分析。
+- 日志采集由 `scripts/collect_unified_logs.py` 独立完成，可通过 cron 或 systemd 运行。
+- `once` 模式使用 offset state 记录读取位置，避免重复采集同一批日志。
+- SQLite 默认只保留最近 7 天日志，过期数据归档到 `data/archives/*.jsonl`。
+- AI 分析只在用户点击按钮时触发，不自动分析全部日志，也不执行系统命令。
+- 当前最终版本不生成 Markdown 报告，早期历史接口仅作为兼容能力保留。
+
 ## 功能概览
 
 - 统一日志采集：支持定时读取和 tail 实时跟随。
@@ -20,13 +37,17 @@ AI-OpsLog 是一个基于OpenAI codex开发的面向运维场景的 AI 日志分
 
 ## 页面预览
 
-集中日志看板：
+1. WEB界面数据总览
 
-![AI-OpsLog dashboard](docs/assets/screenshots/dashboard.png)
+![AI-OpsLog board](docs/assets/screenshots/大屏.png)
 
-单条历史记录详情：
+2. 日志信息收集列表
 
-![AI-OpsLog record detail](docs/assets/screenshots/record-detail.png)
+![AI-OpsLog Logslist](docs/assets/screenshots/日志列表.png)
+
+3. AI分析结果
+
+![AI-OpsLog AI](docs/assets/screenshots/AI分析.png)
 
 ## 技术栈
 
@@ -230,6 +251,25 @@ AI-Ops-Portfolio/
 - [统一日志来源说明](docs/log_sources.md)
 - [第六阶段计划](docs/stage-6-plan.md)
 - [历史记录 API](docs/history-api.md)
+- [项目最终总结](docs/project-final-summary.md)
+
+## GitHub 上传前检查
+
+建议上传前执行：
+
+```bash
+python -m compileall backend\app scripts\collect_unified_logs.py
+git status --short
+```
+
+确认不要提交：
+
+- `.env`
+- `data/*.db`
+- `data/*.sqlite`
+- `data/*state*.json`
+- `data/archives/*.jsonl`
+- `logs/*.log`
 
 ## 安全边界
 
