@@ -2,6 +2,7 @@ import os
 from datetime import datetime, timedelta, timezone
 from html import escape
 from pathlib import Path
+from urllib.parse import urlencode
 
 from fastapi import FastAPI, Header, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -30,6 +31,7 @@ from app.storage.history_store import (
 )
 from app.storage.log_store import init_logs_db
 from app.storage.log_store import (
+    count_logs,
     get_log_record_by_id,
     get_recent_logs,
 )
@@ -59,25 +61,69 @@ def dashboard(
     time_from: str | None = None,
     time_to: str | None = None,
     recent_hours: int | None = None,
+    keyword: str | None = None,
     limit: int = 100,
+    page: int = 1,
 ) -> HTMLResponse:
     error_message = ""
     normalized_time_from = _effective_time_from(time_from, recent_hours)
+    normalized_limit = _normalize_dashboard_limit(limit)
+    normalized_page = max(page, 1)
+    normalized_source = _normalize_history_filter(source)
+    normalized_host = _normalize_history_filter(host)
+    normalized_log_level = _normalize_history_filter(log_level)
+    normalized_keyword = _normalize_history_filter(keyword)
+    normalized_time_to = _normalize_history_filter(time_to)
+    total_count = 0
     try:
-        records = get_recent_logs(
-            limit=limit,
-            source=_normalize_history_filter(source),
-            host=_normalize_history_filter(host),
-            log_level=_normalize_history_filter(log_level),
+        total_count = count_logs(
+            source=normalized_source,
+            host=normalized_host,
+            log_level=normalized_log_level,
             time_from=normalized_time_from,
-            time_to=_normalize_history_filter(time_to),
+            time_to=normalized_time_to,
+            keyword=normalized_keyword,
+        )
+        total_pages = max((total_count + normalized_limit - 1) // normalized_limit, 1)
+        normalized_page = min(normalized_page, total_pages)
+        offset = (normalized_page - 1) * normalized_limit
+        records = get_recent_logs(
+            limit=normalized_limit,
+            source=normalized_source,
+            host=normalized_host,
+            log_level=normalized_log_level,
+            time_from=normalized_time_from,
+            time_to=normalized_time_to,
+            keyword=normalized_keyword,
+            offset=offset,
         )
     except Exception as exc:
         records = []
         error_message = f"统一日志查询失败：{exc}"
 
     table_body = _render_dashboard_rows(records)
-    filter_form = _render_log_filter_form(source, host, log_level, time_from, time_to, recent_hours, limit)
+    filter_form = _render_log_filter_form(
+        source,
+        host,
+        log_level,
+        time_from,
+        time_to,
+        recent_hours,
+        keyword,
+        normalized_limit,
+    )
+    pagination = _render_log_pagination(
+        total_count=total_count,
+        page=normalized_page,
+        limit=normalized_limit,
+        source=source,
+        host=host,
+        log_level=log_level,
+        time_from=time_from,
+        time_to=time_to,
+        recent_hours=recent_hours,
+        keyword=keyword,
+    )
     error_block = ""
     if error_message:
         error_block = f'<div class="notice error">{escape(error_message)}</div>'
@@ -135,6 +181,36 @@ def dashboard(
       color: #ffffff;
       cursor: pointer;
       font-size: 13px;
+    }}
+    .filters .wide {{
+      grid-column: span 2;
+    }}
+    .pager {{
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin: 10px 0 12px;
+      color: #4b5563;
+      font-size: 13px;
+    }}
+    .pager-links {{
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }}
+    .pager a, .pager .disabled {{
+      display: inline-block;
+      padding: 5px 10px;
+      border: 1px solid #d8dee4;
+      border-radius: 6px;
+      background: #ffffff;
+      color: #1f2937;
+      text-decoration: none;
+    }}
+    .pager .disabled {{
+      color: #9ca3af;
+      background: #f3f4f6;
     }}
     header {{
       margin-bottom: 24px;
@@ -316,7 +392,9 @@ def dashboard(
       <h2>最近日志</h2>
       {error_block}
       {filter_form}
+      {pagination}
       {table_body}
+      {pagination}
       <div id="ai-result" class="ai-result">点击“AI 分析”后，分析结果会显示在这里。</div>
     </section>
 
@@ -433,6 +511,7 @@ def _render_log_filter_form(
     time_from: str | None,
     time_to: str | None,
     recent_hours: int | None,
+    keyword: str | None,
     limit: int,
 ) -> str:
     source_options = [
@@ -459,7 +538,9 @@ def _render_log_filter_form(
         f'<div><label>最近 N 小时</label><select name="recent_hours">{_select_options(recent_hour_options, str(recent_hours) if recent_hours else None, _display_recent_hours)}</select></div>'
         f'<div><label>开始时间</label><input name="time_from" value="{_dashboard_value(time_from)}" placeholder="2026-05-10T00:00:00"></div>'
         f'<div><label>结束时间</label><input name="time_to" value="{_dashboard_value(time_to)}" placeholder="2026-05-10T23:59:59"></div>'
+        f'<div class="wide"><label>消息关键字</label><input name="keyword" value="{_dashboard_value(keyword)}" placeholder="error / timeout / connection refused"></div>'
         f'<div><label>数量</label><input name="limit" value="{_dashboard_value(limit)}"></div>'
+        '<input type="hidden" name="page" value="1">'
         "<button type=\"submit\">筛选日志</button>"
         "</form>"
     )
@@ -473,6 +554,71 @@ def _select_options(options: list[str], selected: str | None, display_func) -> s
         selected_attr = " selected" if option == normalized_selected else ""
         rendered.append(f'<option value="{escape(option)}"{selected_attr}>{escape(label)}</option>')
     return "".join(rendered)
+
+
+def _render_log_pagination(
+    total_count: int,
+    page: int,
+    limit: int,
+    source: str | None,
+    host: str | None,
+    log_level: str | None,
+    time_from: str | None,
+    time_to: str | None,
+    recent_hours: int | None,
+    keyword: str | None,
+) -> str:
+    if total_count <= 0:
+        return '<div class="pager"><span>共 0 条日志</span></div>'
+
+    total_pages = max((total_count + limit - 1) // limit, 1)
+    current_page = min(max(page, 1), total_pages)
+    start_index = (current_page - 1) * limit + 1
+    end_index = min(current_page * limit, total_count)
+
+    prev_link = '<span class="disabled">上一页</span>'
+    next_link = '<span class="disabled">下一页</span>'
+    if current_page > 1:
+        prev_link = f'<a href="{_dashboard_page_url(current_page - 1, source, host, log_level, time_from, time_to, recent_hours, keyword, limit)}">上一页</a>'
+    if current_page < total_pages:
+        next_link = f'<a href="{_dashboard_page_url(current_page + 1, source, host, log_level, time_from, time_to, recent_hours, keyword, limit)}">下一页</a>'
+
+    return (
+        '<div class="pager">'
+        f'<span>共 {total_count} 条日志，当前第 {current_page}/{total_pages} 页，显示 {start_index}-{end_index}</span>'
+        f'<div class="pager-links">{prev_link}{next_link}</div>'
+        "</div>"
+    )
+
+
+def _dashboard_page_url(
+    page: int,
+    source: str | None,
+    host: str | None,
+    log_level: str | None,
+    time_from: str | None,
+    time_to: str | None,
+    recent_hours: int | None,
+    keyword: str | None,
+    limit: int,
+) -> str:
+    params = {
+        "source": _normalize_history_filter(source),
+        "host": _normalize_history_filter(host),
+        "log_level": _normalize_history_filter(log_level),
+        "time_from": _normalize_history_filter(time_from),
+        "time_to": _normalize_history_filter(time_to),
+        "recent_hours": recent_hours if recent_hours and recent_hours > 0 else None,
+        "keyword": _normalize_history_filter(keyword),
+        "limit": limit,
+        "page": max(page, 1),
+    }
+    compact_params = {key: value for key, value in params.items() if value not in (None, "")}
+    return "/dashboard/logs?" + urlencode(compact_params)
+
+
+def _normalize_dashboard_limit(limit: int) -> int:
+    return min(max(limit, 1), 200)
 
 
 def _display_recent_hours(value: object) -> str:

@@ -62,7 +62,7 @@ DEBUG
 | `AI_analysis_result` | 预留 AI 分析结果字段，当前可为空 |
 | `created_at` | 写入数据库时间 |
 
-当前采集模块只保存日志行和元数据，不生成 Markdown 报告，不自动触发 AI 分析。
+当前采集模块只保存日志行和元数据，不生成 Markdown 报告，不自动触发 AI 分析。Web 看板可以按 `source`、`host`、`log_level`、时间范围和 `keyword` 查询这些记录。
 
 ## 4. 解析适配器
 

@@ -139,33 +139,22 @@ def get_recent_logs(
     log_level: str | None = None,
     time_from: str | None = None,
     time_to: str | None = None,
+    keyword: str | None = None,
+    offset: int = 0,
 ) -> list[dict[str, Any]]:
     normalized_limit = min(max(limit, 1), 200)
-    filters = {
-        "source": source,
-        "host": host,
-        "log_level": log_level,
-    }
-    where_clauses = []
-    params: list[Any] = []
-
-    for column, value in filters.items():
-        if value:
-            where_clauses.append(f"{column} = ?")
-            params.append(value)
-
-    if time_from:
-        where_clauses.append("COALESCE(timestamp, created_at) >= ?")
-        params.append(time_from)
-    if time_to:
-        where_clauses.append("COALESCE(timestamp, created_at) <= ?")
-        params.append(time_to)
-
-    where_sql = ""
-    if where_clauses:
-        where_sql = "WHERE " + " AND ".join(where_clauses)
+    normalized_offset = max(offset, 0)
+    where_sql, params = _build_log_query_filters(
+        source=source,
+        host=host,
+        log_level=log_level,
+        time_from=time_from,
+        time_to=time_to,
+        keyword=keyword,
+    )
 
     params.append(normalized_limit)
+    params.append(normalized_offset)
     db_path = get_db_path()
 
     with sqlite3.connect(db_path) as connection:
@@ -184,11 +173,41 @@ def get_recent_logs(
             FROM logs
             {where_sql}
             ORDER BY id DESC
-            LIMIT ?;
+            LIMIT ? OFFSET ?;
             """,
             params,
         ).fetchall()
         return [dict(row) for row in rows]
+
+
+def count_logs(
+    source: str | None = None,
+    host: str | None = None,
+    log_level: str | None = None,
+    time_from: str | None = None,
+    time_to: str | None = None,
+    keyword: str | None = None,
+) -> int:
+    where_sql, params = _build_log_query_filters(
+        source=source,
+        host=host,
+        log_level=log_level,
+        time_from=time_from,
+        time_to=time_to,
+        keyword=keyword,
+    )
+    db_path = get_db_path()
+
+    with sqlite3.connect(db_path) as connection:
+        row = connection.execute(
+            f"""
+            SELECT COUNT(*) AS count
+            FROM logs
+            {where_sql};
+            """,
+            params,
+        ).fetchone()
+        return int(row[0]) if row else 0
 
 
 def get_log_record_by_id(log_id: int) -> dict[str, Any] | None:
@@ -229,6 +248,44 @@ def update_log_ai_analysis_result(log_id: int, analysis_result: str) -> bool:
         )
         connection.commit()
         return cursor.rowcount > 0
+
+
+def _build_log_query_filters(
+    source: str | None = None,
+    host: str | None = None,
+    log_level: str | None = None,
+    time_from: str | None = None,
+    time_to: str | None = None,
+    keyword: str | None = None,
+) -> tuple[str, list[Any]]:
+    filters = {
+        "source": source,
+        "host": host,
+        "log_level": log_level,
+    }
+    where_clauses = []
+    params: list[Any] = []
+
+    for column, value in filters.items():
+        if value:
+            where_clauses.append(f"{column} = ?")
+            params.append(value)
+
+    if time_from:
+        where_clauses.append("COALESCE(timestamp, created_at) >= ?")
+        params.append(time_from)
+    if time_to:
+        where_clauses.append("COALESCE(timestamp, created_at) <= ?")
+        params.append(time_to)
+    if keyword:
+        where_clauses.append("message LIKE ?")
+        params.append(f"%{keyword}%")
+
+    where_sql = ""
+    if where_clauses:
+        where_sql = "WHERE " + " AND ".join(where_clauses)
+
+    return where_sql, params
 
 
 def _normalize_record(record: dict[str, Any]) -> dict[str, Any]:

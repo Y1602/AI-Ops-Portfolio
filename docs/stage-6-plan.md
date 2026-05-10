@@ -17,7 +17,8 @@
 - 标准字段：`timestamp`, `source`, `host`, `log_level`, `message`, `AI_analysis_result`, `created_at`
 - 默认保留最近 7 天日志，超出记录归档到 `data/archives/*.jsonl`
 - `GET /dashboard/logs` 集中日志看板
-- Web 筛选：工具类型、主机、日志等级、最近 N 小时、时间范围、返回数量
+- Web 筛选：工具类型、主机、日志等级、最近 N 小时、时间范围、消息关键字、返回数量、页码
+- Web 分页：使用 `page` 和 `limit` 展示大量日志，默认每页 100 条
 - 单条日志按需 AI 分析：`POST /logs/{id}/analyze`
 - AI 分析结果在页面详情区展示，不写入 Markdown
 - 历史接口 `/history/recent`, `/history/{id}` 保持兼容
@@ -59,6 +60,20 @@ CREATE TABLE IF NOT EXISTS logs (
 ## 5. Web 页面
 
 `GET /dashboard/logs` 默认展示最近 100 条日志。
+
+当前支持查询参数：
+
+- `source`
+- `host`
+- `log_level`
+- `recent_hours`
+- `time_from`
+- `time_to`
+- `keyword`
+- `limit`
+- `page`
+
+多个筛选条件之间使用 AND 关系。`keyword` 会在 `message` 字段中做基础包含匹配。
 
 页面展示字段：
 
