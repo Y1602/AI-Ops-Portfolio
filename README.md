@@ -32,6 +32,7 @@ AI-OpsLog 的最终主链路是：
 - Web 看板：`GET /dashboard/logs` 展示最近日志、筛选、搜索、分页和统计。
 - Web 可读性优化：默认展示最近 24 小时的 10 条日志，消息列自动省略，关键字高亮，高风险日志醒目标记。
 - 历史统计：按日志等级和工具类型展示过去 24 小时或 7 天分布。
+- 指标关联：可选接入 Prometheus，只读展示关键指标快照。
 - 按需 AI 分析：点击单条日志的 `AI 分析` 按钮，展示问题原因和排查建议。
 - Runbook 参考：按需 AI 分析会按日志来源和关键词匹配 `docs/runbooks/` 中的故障手册。
 - 历史接口保留：`/history/recent`、`/history/{id}`。
@@ -213,10 +214,35 @@ AI 分析只按需触发，不会自动执行系统命令，不会生成 Markdow
 - `disk-space-low.md`
 - `system-service-error.md`
 
+## Prometheus 指标关联
+
+Prometheus 是可选能力。配置后，Web 看板会展示只读指标快照，并提供 JSON 接口：
+
+```text
+GET /metrics/prometheus
+```
+
+环境变量：
+
+```env
+PROMETHEUS_BASE_URL=http://127.0.0.1:9090
+PROMETHEUS_TIMEOUT_SECONDS=3
+```
+
+当前默认查询：
+
+- `sum(up)`：存活目标数量
+- `sum(rate(http_requests_total{status=~"5.."}[5m]))`：HTTP 5xx 速率
+- `sum(rate(process_cpu_seconds_total[5m]))`：进程 CPU 速率
+- `sum(process_resident_memory_bytes)`：进程内存
+
+该功能只读查询 Prometheus，不会修改监控配置，也不会触发自动处置。
+
 ## 保留接口
 
 - `GET /health`
 - `GET /dashboard/logs`
+- `GET /metrics/prometheus`
 - `POST /logs/{id}/analyze`
 - `GET /history/recent`
 - `GET /history/{id}`

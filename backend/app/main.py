@@ -18,6 +18,7 @@ from app.services.alertmanager_service import (
 )
 from app.services.ingest_service import ingest_log
 from app.services.on_demand_log_ai_service import analyze_unified_log_record
+from app.services.prometheus_client import get_prometheus_snapshot
 from app.services.qwen_client import test_qwen_connection
 from app.storage.history_store import (
     get_analysis_record_by_id,
@@ -75,8 +76,10 @@ def dashboard(
     normalized_stats_hours = _normalize_stats_hours(stats_hours)
     total_count = 0
     stats = {"hours": normalized_stats_hours, "level_counts": {}, "source_counts": {}, "total": 0}
+    prometheus_snapshot = {"configured": False, "metrics": []}
     try:
         stats = get_log_statistics(normalized_stats_hours)
+        prometheus_snapshot = get_prometheus_snapshot()
         total_count = count_logs(
             source=normalized_source,
             host=normalized_host,
@@ -129,6 +132,7 @@ def dashboard(
     )
     stats_panel = _render_statistics_panel(
         stats,
+        prometheus_snapshot,
         normalized_stats_hours,
         source=source,
         host=host,
@@ -433,6 +437,47 @@ def dashboard(
     }}
     .bar-fill.source-mysql {{
       background: #0d9488;
+    }}
+    .metrics-grid {{
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+    }}
+    .metric-card {{
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      padding: 12px;
+      background: #f8fafc;
+    }}
+    .metric-name {{
+      margin: 0 0 6px;
+      color: #475569;
+      font-size: 12px;
+      font-weight: 700;
+    }}
+    .metric-value {{
+      margin: 0;
+      color: #0f172a;
+      font-size: 20px;
+      font-weight: 800;
+    }}
+    .metric-desc {{
+      margin: 6px 0 0;
+      color: #64748b;
+      font-size: 12px;
+      line-height: 1.45;
+    }}
+    .metric-query {{
+      margin-top: 8px;
+      color: #64748b;
+      font-size: 11px;
+      overflow-wrap: anywhere;
+      font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+    }}
+    .metric-muted {{
+      color: #64748b;
+      font-size: 13px;
+      line-height: 1.6;
     }}
     header {{
       margin-bottom: 26px;
@@ -1164,6 +1209,7 @@ def _render_dashboard_rows(records: list[dict], keyword: str | None = None) -> s
 
 def _render_statistics_panel(
     stats: dict,
+    prometheus_snapshot: dict,
     stats_hours: int,
     source: str | None,
     host: str | None,
@@ -1174,7 +1220,7 @@ def _render_statistics_panel(
     keyword: str | None,
     limit: int,
 ) -> str:
-    period_label = "过去 24 小时" if stats_hours == 24 else "过去 7 天"
+    period_label = "?? 24 ??" if stats_hours == 24 else "?? 7 ?"
     level_chart = _render_bar_chart(
         stats.get("level_counts") or {},
         display_log_level,
@@ -1189,6 +1235,7 @@ def _render_statistics_panel(
         filter_name="source",
         stats_hours=stats_hours,
     )
+    metrics_panel = _render_prometheus_metrics(prometheus_snapshot)
     hidden_inputs = _dashboard_hidden_inputs(
         source=source,
         host=host,
@@ -1204,29 +1251,97 @@ def _render_statistics_panel(
       <div class="stats-toolbar">
         <div class="stats-summary">
           <span class="stats-total">{int(stats.get("total") or 0)}</span>
-          <span class="stats-meta">条日志 · {escape(period_label)}</span>
+          <span class="stats-meta">??? ? {escape(period_label)}</span>
         </div>
         <form method="get" action="/dashboard/logs">
           {hidden_inputs}
-          <label>统计时间段
+          <label>?????
             <select name="stats_hours" onchange="this.form.submit()">
-              <option value="24"{' selected' if stats_hours == 24 else ''}>过去 24 小时</option>
-              <option value="168"{' selected' if stats_hours == 168 else ''}>过去 7 天</option>
+              <option value="24"{' selected' if stats_hours == 24 else ''}>?? 24 ??</option>
+              <option value="168"{' selected' if stats_hours == 168 else ''}>?? 7 ?</option>
             </select>
           </label>
         </form>
       </div>
       <div class="stats-grid">
         <div class="stat-panel">
-          <h3>日志等级分布</h3>
+          <h3>??????</h3>
           {level_chart}
         </div>
         <div class="stat-panel">
-          <h3>工具类型分布</h3>
+          <h3>??????</h3>
           <div class="stat-panel-scroll">{source_chart}</div>
+        </div>
+        <div class="stat-panel">
+          <h3>Prometheus ????</h3>
+          {metrics_panel}
         </div>
       </div>
     """
+
+
+def _render_prometheus_metrics(snapshot: dict) -> str:
+    if not snapshot.get("configured"):
+        return (
+            '<div class="metric-muted">'
+            "??? Prometheus??? <code>PROMETHEUS_BASE_URL</code> ??"
+            "????????????"
+            "</div>"
+        )
+
+    error = snapshot.get("error")
+    error_block = f'<div class="notice error">Prometheus ???????{escape(str(error))}</div>' if error else ""
+    cards = []
+    for metric in snapshot.get("metrics") or []:
+        value = _format_metric_value(metric.get("value"), metric.get("unit"))
+        cards.append(
+            '<div class="metric-card">'
+            f'<p class="metric-name">{escape(str(metric.get("name") or "-"))}</p>'
+            f'<p class="metric-value">{escape(value)}</p>'
+            f'<p class="metric-desc">{escape(str(metric.get("description") or ""))}</p>'
+            f'<div class="metric-query">{escape(str(metric.get("query") or ""))}</div>'
+            "</div>"
+        )
+
+    if not cards:
+        cards.append('<div class="metric-muted">?? Prometheus ?????</div>')
+
+    return error_block + '<div class="metrics-grid">' + "".join(cards) + "</div>"
+
+
+def _format_metric_value(value: object, unit: object) -> str:
+    if value is None:
+        return "-"
+
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return str(value)
+
+    unit_text = "" if unit is None else str(unit)
+    if unit_text == "bytes":
+        return _format_bytes(number)
+    if number == 0:
+        formatted = "0"
+    elif abs(number) >= 100:
+        formatted = f"{number:.0f}"
+    elif abs(number) >= 10:
+        formatted = f"{number:.1f}"
+    else:
+        formatted = f"{number:.3f}".rstrip("0").rstrip(".")
+    return f"{formatted} {unit_text}".strip()
+
+
+def _format_bytes(value: float) -> str:
+    units = ["B", "KiB", "MiB", "GiB", "TiB"]
+    size = float(value)
+    unit_index = 0
+    while abs(size) >= 1024 and unit_index < len(units) - 1:
+        size /= 1024
+        unit_index += 1
+    if unit_index == 0:
+        return f"{size:.0f} {units[unit_index]}"
+    return f"{size:.1f} {units[unit_index]}"
 
 
 def _render_bar_chart(
@@ -1967,12 +2082,18 @@ def config_check() -> dict:
         "alertmanager_webhook_token_configured": bool(
             os.getenv("ALERTMANAGER_WEBHOOK_TOKEN", "").strip()
         ),
+        "prometheus_base_url_configured": bool(os.getenv("PROMETHEUS_BASE_URL", "").strip()),
     }
 
 
 @app.get("/qwen/test")
 def qwen_test() -> dict:
     return test_qwen_connection()
+
+
+@app.get("/metrics/prometheus")
+def prometheus_metrics() -> dict:
+    return get_prometheus_snapshot()
 
 
 @app.get("/history/recent")
