@@ -7,6 +7,8 @@
 - 使用 SQLite 统一存储采集后的日志数据。
 - 提供 Web 看板：`GET /dashboard/logs`。
 - 支持按工具类型、主机、日志等级、时间范围和关键字筛选日志。
+- 可选接入 Prometheus，只读展示指标快照。
+- 可选展示 Docker / Kubernetes 当前现场的只读快照。
 - 支持单条日志按需 AI 分析：`POST /logs/{id}/analyze`。
 - 保留历史记录接口和早期日志/告警接入接口，保证兼容性。
 
@@ -21,6 +23,8 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 - `GET /health`
 - `GET /dashboard/logs`
+- `GET /metrics/prometheus`
+- `GET /runtime/snapshot`
 - `POST /logs/{id}/analyze`
 - `GET /history/recent`
 - `GET /history/{id}`

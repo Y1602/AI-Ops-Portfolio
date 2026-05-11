@@ -32,7 +32,10 @@ AI-OpsLog 的最终主链路是：
 - Web 看板：`GET /dashboard/logs` 展示最近日志、筛选、搜索、分页和统计。
 - Web 可读性优化：默认展示最近 24 小时的 10 条日志，消息列自动省略，关键字高亮，高风险日志醒目标记。
 - 历史统计：按日志等级和工具类型展示过去 24 小时或 7 天分布。
+- 指标关联：可选接入 Prometheus，只读展示关键指标快照。
+- 现场采集：可选只读展示 Docker 容器和 Kubernetes Pod / Event 快照。
 - 按需 AI 分析：点击单条日志的 `AI 分析` 按钮，展示问题原因和排查建议。
+- Runbook 参考：按需 AI 分析会按日志来源和关键词匹配 `docs/runbooks/` 中的故障手册。
 - 历史接口保留：`/history/recent`、`/history/{id}`。
 
 ## 页面预览
@@ -157,6 +160,7 @@ curl "http://127.0.0.1:8000/dashboard/logs?source=docker&log_level=ERROR&keyword
 - `FATAL` / `ERROR` 行红色高亮，`WARN` 行橙色高亮
 - 统计图表显示数量，鼠标悬停显示占比，点击图表项可快速筛选
 - AI 分析结果使用卡片布局展示，风险等级用色块突出，排查建议支持折叠/展开
+- AI 分析结果支持在浏览器中复制为文本或导出为 `.txt` 文件，不写入服务器报告目录
 - 页面每 60 秒自动刷新一次，并保留当前筛选条件
 
 性能相关优化：
@@ -188,19 +192,86 @@ POST /logs/{id}/analyze
 
 - 问题摘要
 - 关键报错
+- 参考 Runbook
+- 关键证据
 - 命中关键词
-- 问题原因
+- 根因假设
 - 风险等级
 - 可能原因
 - 排查建议
+- 验证方法
+- 操作风险提示
+- 后续预防建议
 - 补充说明
 
 AI 分析只按需触发，不会自动执行系统命令，不会生成 Markdown 报告。
+页面支持将当前 AI 分析结果复制到剪贴板，或导出为本地 `.txt` 文件。导出动作只发生在浏览器侧，不会在服务端生成报告文件。
+
+当前内置 Runbook 位于 [docs/runbooks](docs/runbooks)：
+
+- `nginx-502.md`
+- `redis-connection-error.md`
+- `mysql-connection-error.md`
+- `disk-space-low.md`
+- `system-service-error.md`
+
+## Prometheus 指标关联
+
+Prometheus 是可选能力。配置后，Web 看板会展示只读指标快照，并提供 JSON 接口：
+
+```text
+GET /metrics/prometheus
+```
+
+环境变量：
+
+```env
+PROMETHEUS_BASE_URL=http://127.0.0.1:9090
+PROMETHEUS_TIMEOUT_SECONDS=3
+```
+
+当前默认查询：
+
+- `sum(up)`：存活目标数量
+- `sum(rate(http_requests_total{status=~"5.."}[5m]))`：HTTP 5xx 速率
+- `sum(rate(process_cpu_seconds_total[5m]))`：进程 CPU 速率
+- `sum(process_resident_memory_bytes)`：进程内存
+
+该功能只读查询 Prometheus，不会修改监控配置，也不会触发自动处置。
+
+## Docker / Kubernetes 只读现场采集
+
+Docker / Kubernetes 现场采集是可选能力。配置后，Web 看板会展示当前运行现场的只读快照，并提供 JSON 接口：
+
+```text
+GET /runtime/snapshot
+```
+
+环境变量：
+
+```env
+AI_OPSLOG_ENABLE_DOCKER_SNAPSHOT=true
+AI_OPSLOG_ENABLE_KUBERNETES_SNAPSHOT=true
+RUNTIME_SNAPSHOT_TIMEOUT_SECONDS=3
+RUNTIME_SNAPSHOT_MAX_ITEMS=8
+DOCKER_BIN=docker
+KUBECTL_BIN=kubectl
+```
+
+当前只执行固定只读命令：
+
+- `docker ps --format ...`
+- `kubectl get pods -A --no-headers`
+- `kubectl get events -A --sort-by=.lastTimestamp --no-headers`
+
+该功能不会执行 `delete`、`restart`、`scale`、`apply` 等修改现场状态的命令。Docker 或 kubectl 不可用时，页面会显示简短错误信息，不影响日志查询和 AI 分析。
 
 ## 保留接口
 
 - `GET /health`
 - `GET /dashboard/logs`
+- `GET /metrics/prometheus`
+- `GET /runtime/snapshot`
 - `POST /logs/{id}/analyze`
 - `GET /history/recent`
 - `GET /history/{id}`
@@ -248,7 +319,9 @@ AI-Ops-Portfolio/
 ## 文档
 
 - [自动日志采集说明](docs/auto-collection.md)
+- [Docker / Kubernetes 只读现场采集](docs/runtime-snapshot.md)
 - [统一日志来源说明](docs/log_sources.md)
+- [故障 Runbook](docs/runbooks/README.md)
 - [第六阶段计划](docs/stage-6-plan.md)
 - [历史记录 API](docs/history-api.md)
 - [项目最终总结](docs/project-final-summary.md)
