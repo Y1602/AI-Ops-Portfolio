@@ -690,6 +690,42 @@ def dashboard(
       border-bottom: 1px solid #e5e7eb;
       background: #f8fafc;
     }}
+    .ai-title-block {{
+      min-width: 0;
+    }}
+    .ai-meta {{
+      margin: 4px 0 0;
+      color: #64748b;
+      font-size: 13px;
+    }}
+    .ai-header-actions {{
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px;
+    }}
+    .ai-tool-button {{
+      height: 30px;
+      padding: 0 10px;
+      border: 1px solid #d8dee4;
+      border-radius: 8px;
+      background: #ffffff;
+      color: #1f2937;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 700;
+    }}
+    .ai-tool-button:hover {{
+      border-color: #2563eb;
+      color: #1d4ed8;
+      background: #eff6ff;
+    }}
+    .copy-status {{
+      color: #166534;
+      font-size: 12px;
+      font-weight: 700;
+    }}
     .risk-pill {{
       display: inline-flex;
       align-items: center;
@@ -791,6 +827,15 @@ def dashboard(
       .stats-grid {{
         grid-template-columns: 1fr;
       }}
+      .ai-card-body {{
+        grid-template-columns: 1fr;
+      }}
+      .ai-card-header {{
+        align-items: flex-start;
+      }}
+      .ai-header-actions {{
+        justify-content: flex-start;
+      }}
     }}
   </style>
 </head>
@@ -843,6 +888,13 @@ def dashboard(
       return "<ul>" + items.map(item => "<li>" + escapeHtml(item) + "</li>").join("") + "</ul>";
     }}
 
+    function listText(items) {{
+      if (!Array.isArray(items) || items.length === 0) {{
+        return "-";
+      }}
+      return items.map((item, index) => `${{index + 1}}. ${{String(item)}}`).join("\\n");
+    }}
+
     function displayRiskLevel(value) {{
       const mapping = {{
         critical: "严重",
@@ -863,6 +915,93 @@ def dashboard(
       return "risk-unknown";
     }}
 
+    let currentAnalysisData = null;
+
+    function buildAnalysisText(data) {{
+      const result = data?.analysis_result || {{}};
+      const risk = result.risk_level || "unknown";
+      return [
+        `AI-OpsLog 日志 #${{data?.log_id ?? "-"}} AI 分析结果`,
+        "",
+        `风险等级：${{displayRiskLevel(risk)}}`,
+        `参考 Runbook：${{result.runbook_used || "-"}}`,
+        "",
+        "问题摘要：",
+        result.summary || "-",
+        "",
+        "关键报错：",
+        result.key_error || "-",
+        "",
+        "关键证据：",
+        listText(result.evidence),
+        "",
+        "根因假设：",
+        result.root_cause_hypothesis || result.root_cause || result.possible_root_cause || "-",
+        "",
+        "命中关键词：",
+        listText(result.matched_keywords),
+        "",
+        "可能原因：",
+        listText(result.possible_causes),
+        "",
+        "排查建议：",
+        listText(result.troubleshooting_steps || result.recommendations),
+        "",
+        "验证方法：",
+        listText(result.verification_methods),
+        "",
+        "操作风险提示：",
+        result.operation_risk || "-",
+        "",
+        "后续预防建议：",
+        listText(result.prevention_suggestions),
+        "",
+        "补充说明：",
+        result.notes || "-",
+      ].join("\\n");
+    }}
+
+    async function copyAnalysisResult() {{
+      if (!currentAnalysisData) {{
+        return;
+      }}
+      const text = buildAnalysisText(currentAnalysisData);
+      try {{
+        await navigator.clipboard.writeText(text);
+      }} catch (error) {{
+        const textarea = document.createElement("textarea");
+        textarea.value = text;
+        textarea.style.position = "fixed";
+        textarea.style.left = "-9999px";
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textarea);
+      }}
+      const status = document.getElementById("copy-status");
+      if (status) {{
+        status.textContent = "已复制";
+        setTimeout(() => {{ status.textContent = ""; }}, 1800);
+      }}
+    }}
+
+    function downloadAnalysisResult() {{
+      if (!currentAnalysisData) {{
+        return;
+      }}
+      const text = buildAnalysisText(currentAnalysisData);
+      const blob = new Blob([text], {{ type: "text/plain;charset=utf-8" }});
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "ai-opslog-analysis-log-" + (currentAnalysisData.log_id || "unknown") + ".txt";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    }}
+
     function renderAnalysis(data) {{
       const result = data.analysis_result || {{}};
       if (result.error) {{
@@ -871,8 +1010,16 @@ def dashboard(
       const risk = result.risk_level || "unknown";
       return `
         <div class="ai-card-header">
-          <h3>日志 #${{escapeHtml(data.log_id)}} AI 分析结果</h3>
-          <span class="risk-pill ${{riskClass(risk)}}">风险：${{escapeHtml(displayRiskLevel(risk))}}</span>
+          <div class="ai-title-block">
+            <h3>日志 #${{escapeHtml(data.log_id)}} AI 分析结果</h3>
+            <p class="ai-meta">参考 Runbook：${{escapeHtml(result.runbook_used || "-")}}</p>
+          </div>
+          <div class="ai-header-actions">
+            <span class="risk-pill ${{riskClass(risk)}}">风险：${{escapeHtml(displayRiskLevel(risk))}}</span>
+            <button class="ai-tool-button" type="button" onclick="copyAnalysisResult()">复制结果</button>
+            <button class="ai-tool-button" type="button" onclick="downloadAnalysisResult()">导出文本</button>
+            <span id="copy-status" class="copy-status"></span>
+          </div>
         </div>
         <div class="ai-card-body">
           <div class="ai-section">
@@ -882,6 +1029,10 @@ def dashboard(
           <div class="ai-section">
             <h4>关键报错</h4>
             <p>${{escapeHtml(result.key_error || "-")}}</p>
+          </div>
+          <div class="ai-section">
+            <h4>参考 Runbook</h4>
+            <p>${{escapeHtml(result.runbook_used || "-")}}</p>
           </div>
           <details class="ai-section full" open>
             <summary>关键证据</summary>
@@ -942,8 +1093,10 @@ def dashboard(
           throw new Error("HTTP " + response.status);
         }}
         const data = await response.json();
+        currentAnalysisData = data;
         output.innerHTML = renderAnalysis(data);
       }} catch (error) {{
+        currentAnalysisData = null;
         output.textContent = "AI 分析请求失败：" + error;
       }} finally {{
         activeAnalyses.delete(logId);

@@ -28,6 +28,7 @@ docs/project-final-summary.md
 - Web 可读性优化：默认最近 24 小时、默认 10 条、消息列省略、关键字高亮、高风险行高亮
 - 单条日志按需 AI 分析：`POST /logs/{id}/analyze`
 - AI 分析前提取关键报错摘要、命中关键词和上下文
+- AI 分析会按日志来源和关键词匹配 `docs/runbooks/` 中的故障手册作为参考
 - 历史接口 `/history/recent`、`/history/{id}` 保持兼容
 - 自动采集说明文档：`docs/auto-collection.md`
 
@@ -84,6 +85,7 @@ CREATE TABLE IF NOT EXISTS logs (
 - `FATAL` / `ERROR` 日志行红色高亮，`WARN` 日志行橙色高亮
 - 筛选栏包含工具类型、主机、等级、最近 N 小时、时间范围、关键字、数量和操作按钮
 - AI 分析结果面板使用卡片布局，风险等级色块展示，建议内容可折叠/展开
+- AI 分析结果支持复制为文本和浏览器侧导出 `.txt` 文件，不在服务端生成报告
 - 分页工具栏包含总数、页码、上一页/下一页和跳页输入
 - 页面每 60 秒自动刷新一次，并保留当前筛选条件
 
@@ -99,6 +101,7 @@ CREATE TABLE IF NOT EXISTS logs (
 
 - 问题摘要
 - 关键报错
+- 参考 Runbook
 - 关键证据
 - 命中关键词
 - 根因假设

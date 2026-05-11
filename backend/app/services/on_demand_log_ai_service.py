@@ -1,9 +1,15 @@
+from __future__ import annotations
+
 import json
 import re
+from pathlib import Path
 from typing import Any
 
 from app.services.qwen_client import call_qwen_model
 
+
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+RUNBOOK_DIR = PROJECT_ROOT / "docs" / "runbooks"
 
 ERROR_PATTERNS = [
     r"\b(fatal|panic|critical|crit|error|err|exception|failed|failure|timeout|refused|denied|unavailable|down)\b",
@@ -15,7 +21,8 @@ ERROR_PATTERNS = [
 
 def analyze_unified_log_record(record: dict[str, Any]) -> dict[str, Any]:
     log_summary = extract_log_summary(record)
-    prompt = _build_prompt(record, log_summary)
+    runbook = select_runbook(record, log_summary)
+    prompt = _build_prompt(record, log_summary, runbook)
     ai_result = call_qwen_model(prompt)
 
     if not isinstance(ai_result, dict):
@@ -31,6 +38,7 @@ def analyze_unified_log_record(record: dict[str, Any]) -> dict[str, Any]:
             "verification_methods": ["Confirm Qwen API configuration and response format."],
             "operation_risk": "Do not execute remediation commands based on this failed analysis.",
             "prevention_suggestions": [],
+            "runbook_used": runbook.get("name"),
             "notes": str(ai_result),
         }
 
@@ -45,6 +53,7 @@ def analyze_unified_log_record(record: dict[str, Any]) -> dict[str, Any]:
     ai_result.setdefault("verification_methods", _fallback_verification_methods(record))
     ai_result.setdefault("operation_risk", _fallback_operation_risk(record))
     ai_result.setdefault("prevention_suggestions", [])
+    ai_result.setdefault("runbook_used", runbook.get("name"))
     ai_result.setdefault("source", record.get("source"))
     ai_result.setdefault("host", record.get("host"))
     ai_result.setdefault("log_level", record.get("log_level"))
@@ -73,7 +82,37 @@ def extract_log_summary(record: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _build_prompt(record: dict[str, Any], log_summary: dict[str, Any]) -> str:
+def select_runbook(record: dict[str, Any], log_summary: dict[str, Any]) -> dict[str, str | None]:
+    source = str(record.get("source") or "").lower()
+    message = str(record.get("message") or "").lower()
+    keywords = " ".join(str(item).lower() for item in log_summary.get("matched_keywords") or [])
+
+    filename = None
+    if "no space left" in message or "disk" in message or "disk" in keywords:
+        filename = "disk-space-low.md"
+    elif source.startswith("nginx") or any(token in message for token in ["502", "upstream", "bad gateway"]):
+        filename = "nginx-502.md"
+    elif source == "redis" or "redis" in message:
+        filename = "redis-connection-error.md"
+    elif source == "mysql" or "mysql" in message or "innodb" in message:
+        filename = "mysql-connection-error.md"
+    elif source in {"system", "docker", "kubernetes"}:
+        filename = "system-service-error.md"
+
+    if not filename:
+        return {"name": None, "content": None}
+
+    path = RUNBOOK_DIR / filename
+    if not path.exists():
+        return {"name": filename, "content": None}
+
+    return {
+        "name": filename,
+        "content": _truncate(path.read_text(encoding="utf-8", errors="replace"), 2400),
+    }
+
+
+def _build_prompt(record: dict[str, Any], log_summary: dict[str, Any], runbook: dict[str, str | None]) -> str:
     payload = {
         "timestamp": record.get("timestamp"),
         "source": record.get("source"),
@@ -81,37 +120,44 @@ def _build_prompt(record: dict[str, Any], log_summary: dict[str, Any]) -> str:
         "log_level": record.get("log_level"),
         "created_at": record.get("created_at"),
         "log_summary": log_summary,
+        "selected_runbook": runbook.get("name"),
         "raw_message": _truncate(str(record.get("message") or ""), 3000),
     }
+    runbook_text = runbook.get("content") or "未匹配到可用 Runbook。"
 
     return f"""
-?????/SRE ???????????? JSON????? Markdown??????????
+请作为运维/SRE 日志分析助手，只返回严格 JSON，不要返回 Markdown，不要输出额外解释。
 
-????????????????????????????
-???
-1. ?????????
-2. ??????????????
-3. ??????????????????????????????????
-4. ???????????????????????????????
-5. ?????????????????????????????
+请基于下面的单条日志、已提取的关键报错摘要，以及可选 Runbook 进行按需分析。
+要求：
+1. 不要执行系统命令。
+2. 不要假设已经执行过任何操作。
+3. 每个结论都尽量基于日志字段、日志等级、关键报错、命中关键词或 Runbook 形成证据。
+4. 如果证据不足，必须明确说明“当前证据不足，不能确认唯一根因”。
+5. 排查步骤和验证方法只能作为人工参考，不要写成已经执行完成。
+6. Runbook 只能作为经验参考，不能覆盖当前日志证据。
 
-?????
+日志数据：
 {json.dumps(payload, ensure_ascii=False, indent=2)}
 
-?? JSON ???????
+可参考 Runbook：
+{runbook_text}
+
+返回 JSON 结构必须包含：
 {{
-  "summary": "?????????",
-  "key_error": "????????",
-  "evidence": ["??1???????/????/?????", "??2"],
-  "root_cause_hypothesis": "?????????????????????????????",
-  "root_cause": "????????? root_cause_hypothesis ??",
+  "summary": "一句话说明日志含义",
+  "key_error": "最关键的报错片段",
+  "evidence": ["证据1，例如日志等级/关键报错/命中关键词/Runbook 判断依据", "证据2"],
+  "root_cause_hypothesis": "基于当前证据的根因假设；证据不足时明确说明不能确认唯一根因",
+  "root_cause": "兼容字段，内容可与 root_cause_hypothesis 一致",
   "risk_level": "critical/high/medium/low/unknown",
-  "possible_causes": ["????1", "????2"],
-  "troubleshooting_steps": ["????1", "????2"],
-  "verification_methods": ["????1", "????2"],
-  "operation_risk": "???????????????/??/??????????",
-  "prevention_suggestions": ["??????1", "??????2"],
-  "notes": "???????"
+  "possible_causes": ["可能原因1", "可能原因2"],
+  "troubleshooting_steps": ["排查步骤1", "排查步骤2"],
+  "verification_methods": ["验证方法1", "验证方法2"],
+  "operation_risk": "操作风险提示，例如不要直接重启/删除/扩缩容或修改生产配置",
+  "prevention_suggestions": ["后续预防建议1", "后续预防建议2"],
+  "runbook_used": "{runbook.get("name") or ""}",
+  "notes": "必要的补充说明"
 }}
 """.strip()
 

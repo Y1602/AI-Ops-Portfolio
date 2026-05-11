@@ -33,6 +33,7 @@ AI-OpsLog 的最终主链路是：
 - Web 可读性优化：默认展示最近 24 小时的 10 条日志，消息列自动省略，关键字高亮，高风险日志醒目标记。
 - 历史统计：按日志等级和工具类型展示过去 24 小时或 7 天分布。
 - 按需 AI 分析：点击单条日志的 `AI 分析` 按钮，展示问题原因和排查建议。
+- Runbook 参考：按需 AI 分析会按日志来源和关键词匹配 `docs/runbooks/` 中的故障手册。
 - 历史接口保留：`/history/recent`、`/history/{id}`。
 
 ## 页面预览
@@ -157,6 +158,7 @@ curl "http://127.0.0.1:8000/dashboard/logs?source=docker&log_level=ERROR&keyword
 - `FATAL` / `ERROR` 行红色高亮，`WARN` 行橙色高亮
 - 统计图表显示数量，鼠标悬停显示占比，点击图表项可快速筛选
 - AI 分析结果使用卡片布局展示，风险等级用色块突出，排查建议支持折叠/展开
+- AI 分析结果支持在浏览器中复制为文本或导出为 `.txt` 文件，不写入服务器报告目录
 - 页面每 60 秒自动刷新一次，并保留当前筛选条件
 
 性能相关优化：
@@ -188,6 +190,7 @@ POST /logs/{id}/analyze
 
 - 问题摘要
 - 关键报错
+- 参考 Runbook
 - 关键证据
 - 命中关键词
 - 根因假设
@@ -200,6 +203,15 @@ POST /logs/{id}/analyze
 - 补充说明
 
 AI 分析只按需触发，不会自动执行系统命令，不会生成 Markdown 报告。
+页面支持将当前 AI 分析结果复制到剪贴板，或导出为本地 `.txt` 文件。导出动作只发生在浏览器侧，不会在服务端生成报告文件。
+
+当前内置 Runbook 位于 [docs/runbooks](docs/runbooks)：
+
+- `nginx-502.md`
+- `redis-connection-error.md`
+- `mysql-connection-error.md`
+- `disk-space-low.md`
+- `system-service-error.md`
 
 ## 保留接口
 
@@ -253,6 +265,7 @@ AI-Ops-Portfolio/
 
 - [自动日志采集说明](docs/auto-collection.md)
 - [统一日志来源说明](docs/log_sources.md)
+- [故障 Runbook](docs/runbooks/README.md)
 - [第六阶段计划](docs/stage-6-plan.md)
 - [历史记录 API](docs/history-api.md)
 - [项目最终总结](docs/project-final-summary.md)
