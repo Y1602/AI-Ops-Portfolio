@@ -33,6 +33,7 @@ AI-OpsLog 的最终主链路是：
 - Web 可读性优化：默认展示最近 24 小时的 10 条日志，消息列自动省略，关键字高亮，高风险日志醒目标记。
 - 历史统计：按日志等级和工具类型展示过去 24 小时或 7 天分布。
 - 指标关联：可选接入 Prometheus，只读展示关键指标快照。
+- 现场采集：可选只读展示 Docker 容器和 Kubernetes Pod / Event 快照。
 - 按需 AI 分析：点击单条日志的 `AI 分析` 按钮，展示问题原因和排查建议。
 - Runbook 参考：按需 AI 分析会按日志来源和关键词匹配 `docs/runbooks/` 中的故障手册。
 - 历史接口保留：`/history/recent`、`/history/{id}`。
@@ -238,11 +239,39 @@ PROMETHEUS_TIMEOUT_SECONDS=3
 
 该功能只读查询 Prometheus，不会修改监控配置，也不会触发自动处置。
 
+## Docker / Kubernetes 只读现场采集
+
+Docker / Kubernetes 现场采集是可选能力。配置后，Web 看板会展示当前运行现场的只读快照，并提供 JSON 接口：
+
+```text
+GET /runtime/snapshot
+```
+
+环境变量：
+
+```env
+AI_OPSLOG_ENABLE_DOCKER_SNAPSHOT=true
+AI_OPSLOG_ENABLE_KUBERNETES_SNAPSHOT=true
+RUNTIME_SNAPSHOT_TIMEOUT_SECONDS=3
+RUNTIME_SNAPSHOT_MAX_ITEMS=8
+DOCKER_BIN=docker
+KUBECTL_BIN=kubectl
+```
+
+当前只执行固定只读命令：
+
+- `docker ps --format ...`
+- `kubectl get pods -A --no-headers`
+- `kubectl get events -A --sort-by=.lastTimestamp --no-headers`
+
+该功能不会执行 `delete`、`restart`、`scale`、`apply` 等修改现场状态的命令。Docker 或 kubectl 不可用时，页面会显示简短错误信息，不影响日志查询和 AI 分析。
+
 ## 保留接口
 
 - `GET /health`
 - `GET /dashboard/logs`
 - `GET /metrics/prometheus`
+- `GET /runtime/snapshot`
 - `POST /logs/{id}/analyze`
 - `GET /history/recent`
 - `GET /history/{id}`
@@ -290,6 +319,7 @@ AI-Ops-Portfolio/
 ## 文档
 
 - [自动日志采集说明](docs/auto-collection.md)
+- [Docker / Kubernetes 只读现场采集](docs/runtime-snapshot.md)
 - [统一日志来源说明](docs/log_sources.md)
 - [故障 Runbook](docs/runbooks/README.md)
 - [第六阶段计划](docs/stage-6-plan.md)

@@ -20,6 +20,7 @@ from app.services.ingest_service import ingest_log
 from app.services.on_demand_log_ai_service import analyze_unified_log_record
 from app.services.prometheus_client import get_prometheus_snapshot
 from app.services.qwen_client import test_qwen_connection
+from app.services.runtime_snapshot_service import get_runtime_snapshot
 from app.storage.history_store import (
     get_analysis_record_by_id,
     get_recent_analysis_records,
@@ -77,9 +78,11 @@ def dashboard(
     total_count = 0
     stats = {"hours": normalized_stats_hours, "level_counts": {}, "source_counts": {}, "total": 0}
     prometheus_snapshot = {"configured": False, "metrics": []}
+    runtime_snapshot = {"docker": {}, "kubernetes": {}}
     try:
         stats = get_log_statistics(normalized_stats_hours)
         prometheus_snapshot = get_prometheus_snapshot()
+        runtime_snapshot = get_runtime_snapshot()
         total_count = count_logs(
             source=normalized_source,
             host=normalized_host,
@@ -133,6 +136,7 @@ def dashboard(
     stats_panel = _render_statistics_panel(
         stats,
         prometheus_snapshot,
+        runtime_snapshot,
         normalized_stats_hours,
         source=source,
         host=host,
@@ -473,6 +477,58 @@ def dashboard(
       font-size: 11px;
       overflow-wrap: anywhere;
       font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+    }}
+    .runtime-list {{
+      display: grid;
+      gap: 10px;
+    }}
+    .runtime-section {{
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      padding: 12px;
+      background: #f8fafc;
+    }}
+    .runtime-section h4 {{
+      margin: 0 0 8px;
+      color: #0f172a;
+      font-size: 14px;
+    }}
+    .runtime-item {{
+      padding: 8px 0;
+      border-top: 1px solid #e5e7eb;
+      font-size: 12px;
+      line-height: 1.45;
+    }}
+    .runtime-item:first-of-type {{
+      border-top: 0;
+      padding-top: 0;
+    }}
+    .runtime-title {{
+      color: #1f2937;
+      font-weight: 800;
+      overflow-wrap: anywhere;
+    }}
+    .runtime-meta {{
+      margin-top: 3px;
+      color: #64748b;
+      overflow-wrap: anywhere;
+    }}
+    .runtime-status {{
+      display: inline-block;
+      margin-left: 6px;
+      padding: 1px 7px;
+      border-radius: 999px;
+      background: #e0f2fe;
+      color: #075985;
+      font-weight: 700;
+    }}
+    .runtime-status.warn {{
+      background: #fffbeb;
+      color: #92400e;
+    }}
+    .runtime-status.error {{
+      background: #fef2f2;
+      color: #991b1b;
     }}
     .metric-muted {{
       color: #64748b;
@@ -908,6 +964,7 @@ def dashboard(
       <div class="links">
         <a href="/dashboard/logs">GET /dashboard/logs</a>
         <a href="/history/recent">GET /history/recent</a>
+        <a href="/runtime/snapshot">GET /runtime/snapshot</a>
         <span class="endpoint">GET /history/{{id}}</span>
         <span class="endpoint">POST /logs/{{id}}/analyze</span>
         <span class="endpoint">POST /logs/ingest</span>
@@ -1210,6 +1267,7 @@ def _render_dashboard_rows(records: list[dict], keyword: str | None = None) -> s
 def _render_statistics_panel(
     stats: dict,
     prometheus_snapshot: dict,
+    runtime_snapshot: dict,
     stats_hours: int,
     source: str | None,
     host: str | None,
@@ -1220,7 +1278,7 @@ def _render_statistics_panel(
     keyword: str | None,
     limit: int,
 ) -> str:
-    period_label = "?? 24 ??" if stats_hours == 24 else "?? 7 ?"
+    period_label = "过去 24 小时" if stats_hours == 24 else "过去 7 天"
     level_chart = _render_bar_chart(
         stats.get("level_counts") or {},
         display_log_level,
@@ -1236,6 +1294,7 @@ def _render_statistics_panel(
         stats_hours=stats_hours,
     )
     metrics_panel = _render_prometheus_metrics(prometheus_snapshot)
+    runtime_panel = _render_runtime_snapshot(runtime_snapshot)
     hidden_inputs = _dashboard_hidden_inputs(
         source=source,
         host=host,
@@ -1251,30 +1310,34 @@ def _render_statistics_panel(
       <div class="stats-toolbar">
         <div class="stats-summary">
           <span class="stats-total">{int(stats.get("total") or 0)}</span>
-          <span class="stats-meta">??? ? {escape(period_label)}</span>
+          <span class="stats-meta">条日志 · {escape(period_label)}</span>
         </div>
         <form method="get" action="/dashboard/logs">
           {hidden_inputs}
-          <label>?????
+          <label>统计时间段
             <select name="stats_hours" onchange="this.form.submit()">
-              <option value="24"{' selected' if stats_hours == 24 else ''}>?? 24 ??</option>
-              <option value="168"{' selected' if stats_hours == 168 else ''}>?? 7 ?</option>
+              <option value="24"{' selected' if stats_hours == 24 else ''}>过去 24 小时</option>
+              <option value="168"{' selected' if stats_hours == 168 else ''}>过去 7 天</option>
             </select>
           </label>
         </form>
       </div>
       <div class="stats-grid">
         <div class="stat-panel">
-          <h3>??????</h3>
+          <h3>日志等级分布</h3>
           {level_chart}
         </div>
         <div class="stat-panel">
-          <h3>??????</h3>
+          <h3>工具类型分布</h3>
           <div class="stat-panel-scroll">{source_chart}</div>
         </div>
         <div class="stat-panel">
-          <h3>Prometheus ????</h3>
+          <h3>Prometheus 指标快照</h3>
           {metrics_panel}
+        </div>
+        <div class="stat-panel">
+          <h3>Docker / Kubernetes 现场快照</h3>
+          {runtime_panel}
         </div>
       </div>
     """
@@ -1307,6 +1370,82 @@ def _render_prometheus_metrics(snapshot: dict) -> str:
         cards.append('<div class="metric-muted">?? Prometheus ?????</div>')
 
     return error_block + '<div class="metrics-grid">' + "".join(cards) + "</div>"
+
+
+def _render_runtime_snapshot(snapshot: dict) -> str:
+    docker = snapshot.get("docker") or {}
+    kubernetes = snapshot.get("kubernetes") or {}
+    return (
+        '<div class="runtime-list">'
+        f'{_render_docker_snapshot(docker)}'
+        f'{_render_kubernetes_snapshot(kubernetes)}'
+        "</div>"
+    )
+
+
+def _render_docker_snapshot(snapshot: dict) -> str:
+    if not snapshot.get("enabled", True):
+        return '<div class="runtime-section"><h4>Docker</h4><div class="metric-muted">Docker 现场采集已禁用。</div></div>'
+    if not snapshot.get("available"):
+        error = escape(str(snapshot.get("error") or "Docker 不可用。"))
+        return f'<div class="runtime-section"><h4>Docker</h4><div class="metric-muted">{error}</div></div>'
+
+    containers = snapshot.get("containers") or []
+    if not containers:
+        return '<div class="runtime-section"><h4>Docker</h4><div class="metric-muted">当前未发现运行中的容器。</div></div>'
+
+    items = []
+    for item in containers:
+        status = str(item.get("status") or "")
+        status_class = "error" if "exited" in status.lower() else ""
+        items.append(
+            '<div class="runtime-item">'
+            f'<div class="runtime-title">{escape(str(item.get("name") or "-"))}'
+            f' <span class="runtime-status {status_class}">{escape(status or "-")}</span></div>'
+            f'<div class="runtime-meta">镜像：{escape(str(item.get("image") or "-"))} · ID：{escape(str(item.get("id") or "-"))}</div>'
+            "</div>"
+        )
+    return '<div class="runtime-section"><h4>Docker 运行容器</h4>' + "".join(items) + "</div>"
+
+
+def _render_kubernetes_snapshot(snapshot: dict) -> str:
+    if not snapshot.get("enabled", True):
+        return '<div class="runtime-section"><h4>Kubernetes</h4><div class="metric-muted">Kubernetes 现场采集已禁用。</div></div>'
+    if not snapshot.get("available"):
+        error = escape(str(snapshot.get("error") or "kubectl 不可用或未配置 kubeconfig。"))
+        return f'<div class="runtime-section"><h4>Kubernetes</h4><div class="metric-muted">{error}</div></div>'
+
+    pods = snapshot.get("pods") or []
+    events = snapshot.get("events") or []
+    parts = ['<div class="runtime-section"><h4>Kubernetes Pods</h4>']
+    if pods:
+        for pod in pods:
+            status = str(pod.get("status") or "")
+            status_class = "" if status.lower() in {"running", "completed"} else "warn"
+            parts.append(
+                '<div class="runtime-item">'
+                f'<div class="runtime-title">{escape(str(pod.get("namespace") or "-"))}/{escape(str(pod.get("name") or "-"))}'
+                f' <span class="runtime-status {status_class}">{escape(status or "-")}</span></div>'
+                f'<div class="runtime-meta">Ready：{escape(str(pod.get("ready") or "-"))} · Restarts：{escape(str(pod.get("restarts") or "-"))} · Age：{escape(str(pod.get("age") or "-"))}</div>'
+                "</div>"
+            )
+    else:
+        parts.append('<div class="metric-muted">未发现 Pod 信息。</div>')
+
+    if events:
+        parts.append("<h4>Kubernetes 最近事件</h4>")
+        for event in events:
+            event_type = str(event.get("type") or "")
+            status_class = "warn" if event_type.lower() == "warning" else ""
+            parts.append(
+                '<div class="runtime-item">'
+                f'<div class="runtime-title">{escape(str(event.get("namespace") or "-"))} '
+                f'<span class="runtime-status {status_class}">{escape(event_type or "-")}</span></div>'
+                f'<div class="runtime-meta">{escape(str(event.get("reason") or "-"))} · {escape(str(event.get("object") or "-"))} · {escape(str(event.get("message") or "-"))}</div>'
+                "</div>"
+            )
+    parts.append("</div>")
+    return "".join(parts)
 
 
 def _format_metric_value(value: object, unit: object) -> str:
@@ -2083,6 +2222,11 @@ def config_check() -> dict:
             os.getenv("ALERTMANAGER_WEBHOOK_TOKEN", "").strip()
         ),
         "prometheus_base_url_configured": bool(os.getenv("PROMETHEUS_BASE_URL", "").strip()),
+        "docker_snapshot_enabled": _is_env_enabled("AI_OPSLOG_ENABLE_DOCKER_SNAPSHOT", default=True),
+        "kubernetes_snapshot_enabled": _is_env_enabled(
+            "AI_OPSLOG_ENABLE_KUBERNETES_SNAPSHOT",
+            default=True,
+        ),
     }
 
 
@@ -2094,6 +2238,11 @@ def qwen_test() -> dict:
 @app.get("/metrics/prometheus")
 def prometheus_metrics() -> dict:
     return get_prometheus_snapshot()
+
+
+@app.get("/runtime/snapshot")
+def runtime_snapshot() -> dict:
+    return get_runtime_snapshot()
 
 
 @app.get("/history/recent")
@@ -2137,6 +2286,13 @@ def _normalize_history_filter(value: str | None) -> str | None:
         return None
     normalized = value.strip()
     return normalized or None
+
+
+def _is_env_enabled(name: str, default: bool) -> bool:
+    raw_value = os.getenv(name, "").strip().lower()
+    if not raw_value:
+        return default
+    return raw_value not in {"0", "false", "no", "off"}
 
 
 @app.get("/history/{record_id}")

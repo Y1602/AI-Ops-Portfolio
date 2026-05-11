@@ -26,6 +26,7 @@ docs/project-final-summary.md
 - Web 筛选：工具类型、主机、日志等级、最近 N 小时、时间范围、消息关键字、返回数量、页码
 - Web 统计：按日志等级和工具类型展示过去 24 小时或 7 天分布
 - Prometheus 指标快照：可选配置 `PROMETHEUS_BASE_URL` 后只读展示关键指标
+- Docker / Kubernetes 现场快照：可选执行固定只读命令，展示容器、Pod 和 Event 状态
 - Web 可读性优化：默认最近 24 小时、默认 10 条、消息列省略、关键字高亮、高风险行高亮
 - 单条日志按需 AI 分析：`POST /logs/{id}/analyze`
 - AI 分析前提取关键报错摘要、命中关键词和上下文
@@ -84,6 +85,14 @@ Prometheus 指标关联：
 - JSON 接口：`GET /metrics/prometheus`
 - Web 看板展示只读指标快照
 - 当前不修改 Prometheus 配置，不触发自动处置
+
+Docker / Kubernetes 只读现场采集：
+
+- 可选配置：`AI_OPSLOG_ENABLE_DOCKER_SNAPSHOT`、`AI_OPSLOG_ENABLE_KUBERNETES_SNAPSHOT`
+- JSON 接口：`GET /runtime/snapshot`
+- Web 看板展示 Docker 运行容器、Kubernetes Pod 和最近 Event 快照
+- 当前只执行 `docker ps`、`kubectl get pods`、`kubectl get events` 等固定只读命令
+- 当前不执行删除、重启、扩缩容、apply 等会修改现场状态的操作
 
 展示层优化：
 - 时间统一显示为 `YYYY-MM-DD HH:MM:SS`
