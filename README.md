@@ -52,6 +52,8 @@ AI-OpsLog 的最终主链路是：
 
 ![AI-OpsLog AI](docs/assets/screenshots/AI分析.png)
 
+![AI-OpsLog AI](docs/assets/screenshots/AI分析2.png)
+
 ## 技术栈
 
 - Python
@@ -326,27 +328,9 @@ AI-Ops-Portfolio/
 - [历史记录 API](docs/history-api.md)
 - [项目最终总结](docs/project-final-summary.md)
 
-## GitHub 上传前检查
-
-建议上传前执行：
-
-```bash
-python -m compileall backend\app scripts\collect_unified_logs.py
-git status --short
-```
-
-确认不要提交：
-
-- `.env`
-- `data/*.db`
-- `data/*.sqlite`
-- `data/*state*.json`
-- `data/archives/*.jsonl`
-- `logs/*.log`
-
 ## 安全边界
 
 - AI 输出只作为人工排查参考。
 - 系统不会自动执行 AI 返回的建议。
-- API Key 通过 `.env` 或环境变量注入，不应提交。
+- API Key 通过 `.env` 或环境变量注入，安全起见不建议写入代码中。
 - 当前项目用于 Demo / 学习 / 简历展示，不是生产级平台。
