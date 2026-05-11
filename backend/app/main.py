@@ -18,7 +18,9 @@ from app.services.alertmanager_service import (
 )
 from app.services.ingest_service import ingest_log
 from app.services.on_demand_log_ai_service import analyze_unified_log_record
+from app.services.prometheus_client import get_prometheus_snapshot
 from app.services.qwen_client import test_qwen_connection
+from app.services.runtime_snapshot_service import get_runtime_snapshot
 from app.storage.history_store import (
     get_analysis_record_by_id,
     get_recent_analysis_records,
@@ -75,8 +77,12 @@ def dashboard(
     normalized_stats_hours = _normalize_stats_hours(stats_hours)
     total_count = 0
     stats = {"hours": normalized_stats_hours, "level_counts": {}, "source_counts": {}, "total": 0}
+    prometheus_snapshot = {"configured": False, "metrics": []}
+    runtime_snapshot = {"docker": {}, "kubernetes": {}}
     try:
         stats = get_log_statistics(normalized_stats_hours)
+        prometheus_snapshot = get_prometheus_snapshot()
+        runtime_snapshot = get_runtime_snapshot()
         total_count = count_logs(
             source=normalized_source,
             host=normalized_host,
@@ -129,6 +135,8 @@ def dashboard(
     )
     stats_panel = _render_statistics_panel(
         stats,
+        prometheus_snapshot,
+        runtime_snapshot,
         normalized_stats_hours,
         source=source,
         host=host,
@@ -434,6 +442,99 @@ def dashboard(
     .bar-fill.source-mysql {{
       background: #0d9488;
     }}
+    .metrics-grid {{
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+    }}
+    .metric-card {{
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      padding: 12px;
+      background: #f8fafc;
+    }}
+    .metric-name {{
+      margin: 0 0 6px;
+      color: #475569;
+      font-size: 12px;
+      font-weight: 700;
+    }}
+    .metric-value {{
+      margin: 0;
+      color: #0f172a;
+      font-size: 20px;
+      font-weight: 800;
+    }}
+    .metric-desc {{
+      margin: 6px 0 0;
+      color: #64748b;
+      font-size: 12px;
+      line-height: 1.45;
+    }}
+    .metric-query {{
+      margin-top: 8px;
+      color: #64748b;
+      font-size: 11px;
+      overflow-wrap: anywhere;
+      font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+    }}
+    .runtime-list {{
+      display: grid;
+      gap: 10px;
+    }}
+    .runtime-section {{
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      padding: 12px;
+      background: #f8fafc;
+    }}
+    .runtime-section h4 {{
+      margin: 0 0 8px;
+      color: #0f172a;
+      font-size: 14px;
+    }}
+    .runtime-item {{
+      padding: 8px 0;
+      border-top: 1px solid #e5e7eb;
+      font-size: 12px;
+      line-height: 1.45;
+    }}
+    .runtime-item:first-of-type {{
+      border-top: 0;
+      padding-top: 0;
+    }}
+    .runtime-title {{
+      color: #1f2937;
+      font-weight: 800;
+      overflow-wrap: anywhere;
+    }}
+    .runtime-meta {{
+      margin-top: 3px;
+      color: #64748b;
+      overflow-wrap: anywhere;
+    }}
+    .runtime-status {{
+      display: inline-block;
+      margin-left: 6px;
+      padding: 1px 7px;
+      border-radius: 999px;
+      background: #e0f2fe;
+      color: #075985;
+      font-weight: 700;
+    }}
+    .runtime-status.warn {{
+      background: #fffbeb;
+      color: #92400e;
+    }}
+    .runtime-status.error {{
+      background: #fef2f2;
+      color: #991b1b;
+    }}
+    .metric-muted {{
+      color: #64748b;
+      font-size: 13px;
+      line-height: 1.6;
+    }}
     header {{
       margin-bottom: 26px;
     }}
@@ -690,6 +791,42 @@ def dashboard(
       border-bottom: 1px solid #e5e7eb;
       background: #f8fafc;
     }}
+    .ai-title-block {{
+      min-width: 0;
+    }}
+    .ai-meta {{
+      margin: 4px 0 0;
+      color: #64748b;
+      font-size: 13px;
+    }}
+    .ai-header-actions {{
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px;
+    }}
+    .ai-tool-button {{
+      height: 30px;
+      padding: 0 10px;
+      border: 1px solid #d8dee4;
+      border-radius: 8px;
+      background: #ffffff;
+      color: #1f2937;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 700;
+    }}
+    .ai-tool-button:hover {{
+      border-color: #2563eb;
+      color: #1d4ed8;
+      background: #eff6ff;
+    }}
+    .copy-status {{
+      color: #166534;
+      font-size: 12px;
+      font-weight: 700;
+    }}
     .risk-pill {{
       display: inline-flex;
       align-items: center;
@@ -791,6 +928,15 @@ def dashboard(
       .stats-grid {{
         grid-template-columns: 1fr;
       }}
+      .ai-card-body {{
+        grid-template-columns: 1fr;
+      }}
+      .ai-card-header {{
+        align-items: flex-start;
+      }}
+      .ai-header-actions {{
+        justify-content: flex-start;
+      }}
     }}
   </style>
 </head>
@@ -818,6 +964,7 @@ def dashboard(
       <div class="links">
         <a href="/dashboard/logs">GET /dashboard/logs</a>
         <a href="/history/recent">GET /history/recent</a>
+        <a href="/runtime/snapshot">GET /runtime/snapshot</a>
         <span class="endpoint">GET /history/{{id}}</span>
         <span class="endpoint">POST /logs/{{id}}/analyze</span>
         <span class="endpoint">POST /logs/ingest</span>
@@ -843,6 +990,13 @@ def dashboard(
       return "<ul>" + items.map(item => "<li>" + escapeHtml(item) + "</li>").join("") + "</ul>";
     }}
 
+    function listText(items) {{
+      if (!Array.isArray(items) || items.length === 0) {{
+        return "-";
+      }}
+      return items.map((item, index) => `${{index + 1}}. ${{String(item)}}`).join("\\n");
+    }}
+
     function displayRiskLevel(value) {{
       const mapping = {{
         critical: "严重",
@@ -863,6 +1017,93 @@ def dashboard(
       return "risk-unknown";
     }}
 
+    let currentAnalysisData = null;
+
+    function buildAnalysisText(data) {{
+      const result = data?.analysis_result || {{}};
+      const risk = result.risk_level || "unknown";
+      return [
+        `AI-OpsLog 日志 #${{data?.log_id ?? "-"}} AI 分析结果`,
+        "",
+        `风险等级：${{displayRiskLevel(risk)}}`,
+        `参考 Runbook：${{result.runbook_used || "-"}}`,
+        "",
+        "问题摘要：",
+        result.summary || "-",
+        "",
+        "关键报错：",
+        result.key_error || "-",
+        "",
+        "关键证据：",
+        listText(result.evidence),
+        "",
+        "根因假设：",
+        result.root_cause_hypothesis || result.root_cause || result.possible_root_cause || "-",
+        "",
+        "命中关键词：",
+        listText(result.matched_keywords),
+        "",
+        "可能原因：",
+        listText(result.possible_causes),
+        "",
+        "排查建议：",
+        listText(result.troubleshooting_steps || result.recommendations),
+        "",
+        "验证方法：",
+        listText(result.verification_methods),
+        "",
+        "操作风险提示：",
+        result.operation_risk || "-",
+        "",
+        "后续预防建议：",
+        listText(result.prevention_suggestions),
+        "",
+        "补充说明：",
+        result.notes || "-",
+      ].join("\\n");
+    }}
+
+    async function copyAnalysisResult() {{
+      if (!currentAnalysisData) {{
+        return;
+      }}
+      const text = buildAnalysisText(currentAnalysisData);
+      try {{
+        await navigator.clipboard.writeText(text);
+      }} catch (error) {{
+        const textarea = document.createElement("textarea");
+        textarea.value = text;
+        textarea.style.position = "fixed";
+        textarea.style.left = "-9999px";
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textarea);
+      }}
+      const status = document.getElementById("copy-status");
+      if (status) {{
+        status.textContent = "已复制";
+        setTimeout(() => {{ status.textContent = ""; }}, 1800);
+      }}
+    }}
+
+    function downloadAnalysisResult() {{
+      if (!currentAnalysisData) {{
+        return;
+      }}
+      const text = buildAnalysisText(currentAnalysisData);
+      const blob = new Blob([text], {{ type: "text/plain;charset=utf-8" }});
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "ai-opslog-analysis-log-" + (currentAnalysisData.log_id || "unknown") + ".txt";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    }}
+
     function renderAnalysis(data) {{
       const result = data.analysis_result || {{}};
       if (result.error) {{
@@ -871,8 +1112,16 @@ def dashboard(
       const risk = result.risk_level || "unknown";
       return `
         <div class="ai-card-header">
-          <h3>日志 #${{escapeHtml(data.log_id)}} AI 分析结果</h3>
-          <span class="risk-pill ${{riskClass(risk)}}">风险：${{escapeHtml(displayRiskLevel(risk))}}</span>
+          <div class="ai-title-block">
+            <h3>日志 #${{escapeHtml(data.log_id)}} AI 分析结果</h3>
+            <p class="ai-meta">参考 Runbook：${{escapeHtml(result.runbook_used || "-")}}</p>
+          </div>
+          <div class="ai-header-actions">
+            <span class="risk-pill ${{riskClass(risk)}}">风险：${{escapeHtml(displayRiskLevel(risk))}}</span>
+            <button class="ai-tool-button" type="button" onclick="copyAnalysisResult()">复制结果</button>
+            <button class="ai-tool-button" type="button" onclick="downloadAnalysisResult()">导出文本</button>
+            <span id="copy-status" class="copy-status"></span>
+          </div>
         </div>
         <div class="ai-card-body">
           <div class="ai-section">
@@ -883,9 +1132,17 @@ def dashboard(
             <h4>关键报错</h4>
             <p>${{escapeHtml(result.key_error || "-")}}</p>
           </div>
+          <div class="ai-section">
+            <h4>参考 Runbook</h4>
+            <p>${{escapeHtml(result.runbook_used || "-")}}</p>
+          </div>
+          <details class="ai-section full" open>
+            <summary>关键证据</summary>
+            ${{renderList(result.evidence)}}
+          </details>
           <div class="ai-section full">
-            <h4>问题原因</h4>
-            <p>${{escapeHtml(result.root_cause || result.possible_root_cause || "-")}}</p>
+            <h4>根因假设</h4>
+            <p>${{escapeHtml(result.root_cause_hypothesis || result.root_cause || result.possible_root_cause || "-")}}</p>
           </div>
           <details class="ai-section" open>
             <summary>命中关键词</summary>
@@ -898,6 +1155,18 @@ def dashboard(
           <details class="ai-section full">
             <summary>排查建议</summary>
             ${{renderList(result.troubleshooting_steps || result.recommendations)}}
+          </details>
+          <details class="ai-section full" open>
+            <summary>验证方法</summary>
+            ${{renderList(result.verification_methods)}}
+          </details>
+          <div class="ai-section full">
+            <h4>操作风险提示</h4>
+            <p>${{escapeHtml(result.operation_risk || "-")}}</p>
+          </div>
+          <details class="ai-section full">
+            <summary>后续预防建议</summary>
+            ${{renderList(result.prevention_suggestions)}}
           </details>
           <div class="ai-section full">
             <h4>补充说明</h4>
@@ -926,8 +1195,10 @@ def dashboard(
           throw new Error("HTTP " + response.status);
         }}
         const data = await response.json();
+        currentAnalysisData = data;
         output.innerHTML = renderAnalysis(data);
       }} catch (error) {{
+        currentAnalysisData = null;
         output.textContent = "AI 分析请求失败：" + error;
       }} finally {{
         activeAnalyses.delete(logId);
@@ -995,6 +1266,8 @@ def _render_dashboard_rows(records: list[dict], keyword: str | None = None) -> s
 
 def _render_statistics_panel(
     stats: dict,
+    prometheus_snapshot: dict,
+    runtime_snapshot: dict,
     stats_hours: int,
     source: str | None,
     host: str | None,
@@ -1020,6 +1293,8 @@ def _render_statistics_panel(
         filter_name="source",
         stats_hours=stats_hours,
     )
+    metrics_panel = _render_prometheus_metrics(prometheus_snapshot)
+    runtime_panel = _render_runtime_snapshot(runtime_snapshot)
     hidden_inputs = _dashboard_hidden_inputs(
         source=source,
         host=host,
@@ -1056,8 +1331,156 @@ def _render_statistics_panel(
           <h3>工具类型分布</h3>
           <div class="stat-panel-scroll">{source_chart}</div>
         </div>
+        <div class="stat-panel">
+          <h3>Prometheus 指标快照</h3>
+          {metrics_panel}
+        </div>
+        <div class="stat-panel">
+          <h3>Docker / Kubernetes 现场快照</h3>
+          {runtime_panel}
+        </div>
       </div>
     """
+
+
+def _render_prometheus_metrics(snapshot: dict) -> str:
+    if not snapshot.get("configured"):
+        return (
+            '<div class="metric-muted">'
+            "??? Prometheus??? <code>PROMETHEUS_BASE_URL</code> ??"
+            "????????????"
+            "</div>"
+        )
+
+    error = snapshot.get("error")
+    error_block = f'<div class="notice error">Prometheus ???????{escape(str(error))}</div>' if error else ""
+    cards = []
+    for metric in snapshot.get("metrics") or []:
+        value = _format_metric_value(metric.get("value"), metric.get("unit"))
+        cards.append(
+            '<div class="metric-card">'
+            f'<p class="metric-name">{escape(str(metric.get("name") or "-"))}</p>'
+            f'<p class="metric-value">{escape(value)}</p>'
+            f'<p class="metric-desc">{escape(str(metric.get("description") or ""))}</p>'
+            f'<div class="metric-query">{escape(str(metric.get("query") or ""))}</div>'
+            "</div>"
+        )
+
+    if not cards:
+        cards.append('<div class="metric-muted">?? Prometheus ?????</div>')
+
+    return error_block + '<div class="metrics-grid">' + "".join(cards) + "</div>"
+
+
+def _render_runtime_snapshot(snapshot: dict) -> str:
+    docker = snapshot.get("docker") or {}
+    kubernetes = snapshot.get("kubernetes") or {}
+    return (
+        '<div class="runtime-list">'
+        f'{_render_docker_snapshot(docker)}'
+        f'{_render_kubernetes_snapshot(kubernetes)}'
+        "</div>"
+    )
+
+
+def _render_docker_snapshot(snapshot: dict) -> str:
+    if not snapshot.get("enabled", True):
+        return '<div class="runtime-section"><h4>Docker</h4><div class="metric-muted">Docker 现场采集已禁用。</div></div>'
+    if not snapshot.get("available"):
+        error = escape(str(snapshot.get("error") or "Docker 不可用。"))
+        return f'<div class="runtime-section"><h4>Docker</h4><div class="metric-muted">{error}</div></div>'
+
+    containers = snapshot.get("containers") or []
+    if not containers:
+        return '<div class="runtime-section"><h4>Docker</h4><div class="metric-muted">当前未发现运行中的容器。</div></div>'
+
+    items = []
+    for item in containers:
+        status = str(item.get("status") or "")
+        status_class = "error" if "exited" in status.lower() else ""
+        items.append(
+            '<div class="runtime-item">'
+            f'<div class="runtime-title">{escape(str(item.get("name") or "-"))}'
+            f' <span class="runtime-status {status_class}">{escape(status or "-")}</span></div>'
+            f'<div class="runtime-meta">镜像：{escape(str(item.get("image") or "-"))} · ID：{escape(str(item.get("id") or "-"))}</div>'
+            "</div>"
+        )
+    return '<div class="runtime-section"><h4>Docker 运行容器</h4>' + "".join(items) + "</div>"
+
+
+def _render_kubernetes_snapshot(snapshot: dict) -> str:
+    if not snapshot.get("enabled", True):
+        return '<div class="runtime-section"><h4>Kubernetes</h4><div class="metric-muted">Kubernetes 现场采集已禁用。</div></div>'
+    if not snapshot.get("available"):
+        error = escape(str(snapshot.get("error") or "kubectl 不可用或未配置 kubeconfig。"))
+        return f'<div class="runtime-section"><h4>Kubernetes</h4><div class="metric-muted">{error}</div></div>'
+
+    pods = snapshot.get("pods") or []
+    events = snapshot.get("events") or []
+    parts = ['<div class="runtime-section"><h4>Kubernetes Pods</h4>']
+    if pods:
+        for pod in pods:
+            status = str(pod.get("status") or "")
+            status_class = "" if status.lower() in {"running", "completed"} else "warn"
+            parts.append(
+                '<div class="runtime-item">'
+                f'<div class="runtime-title">{escape(str(pod.get("namespace") or "-"))}/{escape(str(pod.get("name") or "-"))}'
+                f' <span class="runtime-status {status_class}">{escape(status or "-")}</span></div>'
+                f'<div class="runtime-meta">Ready：{escape(str(pod.get("ready") or "-"))} · Restarts：{escape(str(pod.get("restarts") or "-"))} · Age：{escape(str(pod.get("age") or "-"))}</div>'
+                "</div>"
+            )
+    else:
+        parts.append('<div class="metric-muted">未发现 Pod 信息。</div>')
+
+    if events:
+        parts.append("<h4>Kubernetes 最近事件</h4>")
+        for event in events:
+            event_type = str(event.get("type") or "")
+            status_class = "warn" if event_type.lower() == "warning" else ""
+            parts.append(
+                '<div class="runtime-item">'
+                f'<div class="runtime-title">{escape(str(event.get("namespace") or "-"))} '
+                f'<span class="runtime-status {status_class}">{escape(event_type or "-")}</span></div>'
+                f'<div class="runtime-meta">{escape(str(event.get("reason") or "-"))} · {escape(str(event.get("object") or "-"))} · {escape(str(event.get("message") or "-"))}</div>'
+                "</div>"
+            )
+    parts.append("</div>")
+    return "".join(parts)
+
+
+def _format_metric_value(value: object, unit: object) -> str:
+    if value is None:
+        return "-"
+
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return str(value)
+
+    unit_text = "" if unit is None else str(unit)
+    if unit_text == "bytes":
+        return _format_bytes(number)
+    if number == 0:
+        formatted = "0"
+    elif abs(number) >= 100:
+        formatted = f"{number:.0f}"
+    elif abs(number) >= 10:
+        formatted = f"{number:.1f}"
+    else:
+        formatted = f"{number:.3f}".rstrip("0").rstrip(".")
+    return f"{formatted} {unit_text}".strip()
+
+
+def _format_bytes(value: float) -> str:
+    units = ["B", "KiB", "MiB", "GiB", "TiB"]
+    size = float(value)
+    unit_index = 0
+    while abs(size) >= 1024 and unit_index < len(units) - 1:
+        size /= 1024
+        unit_index += 1
+    if unit_index == 0:
+        return f"{size:.0f} {units[unit_index]}"
+    return f"{size:.1f} {units[unit_index]}"
 
 
 def _render_bar_chart(
@@ -1798,12 +2221,28 @@ def config_check() -> dict:
         "alertmanager_webhook_token_configured": bool(
             os.getenv("ALERTMANAGER_WEBHOOK_TOKEN", "").strip()
         ),
+        "prometheus_base_url_configured": bool(os.getenv("PROMETHEUS_BASE_URL", "").strip()),
+        "docker_snapshot_enabled": _is_env_enabled("AI_OPSLOG_ENABLE_DOCKER_SNAPSHOT", default=True),
+        "kubernetes_snapshot_enabled": _is_env_enabled(
+            "AI_OPSLOG_ENABLE_KUBERNETES_SNAPSHOT",
+            default=True,
+        ),
     }
 
 
 @app.get("/qwen/test")
 def qwen_test() -> dict:
     return test_qwen_connection()
+
+
+@app.get("/metrics/prometheus")
+def prometheus_metrics() -> dict:
+    return get_prometheus_snapshot()
+
+
+@app.get("/runtime/snapshot")
+def runtime_snapshot() -> dict:
+    return get_runtime_snapshot()
 
 
 @app.get("/history/recent")
@@ -1847,6 +2286,13 @@ def _normalize_history_filter(value: str | None) -> str | None:
         return None
     normalized = value.strip()
     return normalized or None
+
+
+def _is_env_enabled(name: str, default: bool) -> bool:
+    raw_value = os.getenv(name, "").strip().lower()
+    if not raw_value:
+        return default
+    return raw_value not in {"0", "false", "no", "off"}
 
 
 @app.get("/history/{record_id}")
