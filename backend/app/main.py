@@ -883,9 +883,13 @@ def dashboard(
             <h4>关键报错</h4>
             <p>${{escapeHtml(result.key_error || "-")}}</p>
           </div>
+          <details class="ai-section full" open>
+            <summary>关键证据</summary>
+            ${{renderList(result.evidence)}}
+          </details>
           <div class="ai-section full">
-            <h4>问题原因</h4>
-            <p>${{escapeHtml(result.root_cause || result.possible_root_cause || "-")}}</p>
+            <h4>根因假设</h4>
+            <p>${{escapeHtml(result.root_cause_hypothesis || result.root_cause || result.possible_root_cause || "-")}}</p>
           </div>
           <details class="ai-section" open>
             <summary>命中关键词</summary>
@@ -898,6 +902,18 @@ def dashboard(
           <details class="ai-section full">
             <summary>排查建议</summary>
             ${{renderList(result.troubleshooting_steps || result.recommendations)}}
+          </details>
+          <details class="ai-section full" open>
+            <summary>验证方法</summary>
+            ${{renderList(result.verification_methods)}}
+          </details>
+          <div class="ai-section full">
+            <h4>操作风险提示</h4>
+            <p>${{escapeHtml(result.operation_risk || "-")}}</p>
+          </div>
+          <details class="ai-section full">
+            <summary>后续预防建议</summary>
+            ${{renderList(result.prevention_suggestions)}}
           </details>
           <div class="ai-section full">
             <h4>补充说明</h4>
